@@ -205,3 +205,5 @@ FakesAssemblies/
 *.opt
 
 /Master Bank
+/xpSignalCom
+/XPReport
