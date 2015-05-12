@@ -1,0 +1,65 @@
+Certificate Request:
+    Data:
+        Version: 0 (0x0)
+        Subject: C=RU, L=Москва, OU="1,10", T=Клиент компании, CN=Пучков А.Е., Email=md@rt.mipt.ru
+        Subject Public Key Info:
+            Public Key Algorithm: r3410
+            R3410 Public Key:
+                pub:  (1024 bits)
+                    00:d2:d3:86:b1:3f:c8:21:19:82:75:bb:47:f1:95:
+                    78:53:d8:cc:67:42:9e:85:82:b5:dc:e7:9c:6a:b5:
+                    bb:29:84:cd:bb:b2:65:2c:33:6d:d8:8f:b7:9f:e6:
+                    84:8e:93:6e:2d:80:32:02:fa:c8:3f:78:a4:89:86:
+                    f4:e3:1b:e3:dd:b8:df:37:3c:97:79:75:2e:0e:ff:
+                    cf:e5:d4:a4:58:b4:64:90:d4:e6:09:23:46:ca:75:
+                    35:ed:12:34:8c:eb:19:45:b0:e7:2b:b1:3f:48:06:
+                    9a:f0:07:0e:c5:78:f1:00:cd:1d:b0:cb:00:dc:a0:
+                    d2:b7:a3:ce:b5:24:d2:94:c6
+                P:    (1024 bits)
+                    00:d4:fb:c4:0b:68:22:66:6e:f1:aa:bd:74:0f:fb:
+                    db:d3:c6:f8:3c:65:08:01:35:a0:da:d4:cf:1e:69:
+                    59:b2:3e:fc:a3:b0:4d:bd:c0:59:73:12:db:6d:b8:
+                    92:b2:ad:33:e5:6a:93:80:94:7e:f4:22:27:eb:c7:
+                    c5:3b:01:6a:64:cb:16:66:a2:b4:ad:53:ed:ef:0b:
+                    8c:76:51:62:2a:95:70:38:ca:e5:5a:78:b3:1a:03:
+                    7c:52:d5:bd:19:0d:8d:db:89:03:45:50:01:cb:a3:
+                    0c:f1:11:3c:0b:79:b5:bd:ef:c9:20:01:68:58:32:
+                    f4:f6:25:7f:94:ad:55:52:11
+                Q:    (256 bits)
+                    00:92:0b:7b:8a:3f:1f:6f:51:95:bc:b0:ab:5c:83:
+                    85:0e:e7:c0:88:46:1d:8b:5d:af:27:30:81:83:da:
+                    c5:c6:eb
+                A:    (1024 bits)
+                    00:cc:48:24:a3:ef:62:78:7c:67:40:c2:5c:bb:4b:
+                    0f:e0:c3:9c:01:7f:cd:f9:54:8c:00:be:62:52:3b:
+                    3b:10:b9:01:63:d3:cd:ae:fb:e4:fe:b0:5c:c2:75:
+                    86:d2:b3:36:a6:aa:db:cc:bd:c6:30:5c:3f:e8:7f:
+                    a4:72:4e:5d:04:a3:c9:35:ad:09:6b:55:5a:5d:e2:
+                    e6:c7:5e:e0:2e:4d:c2:87:7a:dd:75:8f:96:eb:4a:
+                    5c:30:aa:75:cd:fb:df:e1:e3:ce:37:43:ca:72:42:
+                    bc:82:e7:84:11:f4:cf:2e:0e:82:a8:27:ca:d2:60:
+                    02:bf:8b:2b:73:53:c5:94:da
+        Attributes:
+            a0:00
+    Signature Algorithm: r3410WithR3411
+        30:44:02:20:4d:e4:72:0a:df:db:6e:2c:aa:5e:c6:3f:7f:ba:
+        ed:c0:0d:23:90:48:80:a8:67:a7:11:4e:1a:04:f0:7d:c9:55:
+        02:20:4d:23:f1:7b:9f:af:e3:f3:b7:69:d3:ba:96:ba:d9:97:
+        0b:24:1c:f7:b8:41:7e:81:51:9c:92:55:94:0d:21:96
+-----BEGIN CERTIFICATE REQUEST-----
+MIICrDCCAk8CAQAwezELMAkGA1UEBhMCUlUxDzANBgNVBAcUBszu8eri4DENMAsG
+A1UECxMEMSwxMDEYMBYGA1UEDBQPyuvo5e3yIOru7O/g7ejoMRQwEgYDVQQDFAvP
+8/fq7uIgwC7FLjEcMBoGCSqGSIb3DQEJARYNbWRAcnQubWlwdC5ydTCCAckwggE9
+BgorBgEEAa1ZAQEFMIIBLQKBgQDU+8QLaCJmbvGqvXQP+9vTxvg8ZQgBNaDa1M8e
+aVmyPvyjsE29wFlzEtttuJKyrTPlapOAlH70Iifrx8U7AWpkyxZmorStU+3vC4x2
+UWIqlXA4yuVaeLMaA3xS1b0ZDY3biQNFUAHLowzxETwLebW978kgAWhYMvT2JX+U
+rVVSEQIhAJILe4o/H29Rlbywq1yDhQ7nwIhGHYtdrycwgYPaxcbrAoGBAMxIJKPv
+Ynh8Z0DCXLtLD+DDnAF/zflUjAC+YlI7OxC5AWPTza775P6wXMJ1htKzNqaq28y9
+xjBcP+h/pHJOXQSjyTWtCWtVWl3i5sde4C5Nwod63XWPlutKXDCqdc373+HjzjdD
+ynJCvILnhBH0zy4OgqgnytJgAr+LK3NTxZTaBQADgYUAAoGBANLThrE/yCEZgnW7
+R/GVeFPYzGdCnoWCtdznnGq1uymEzbuyZSwzbdiPt5/mhI6Tbi2AMgL6yD94pImG
+9OMb49243zc8l3l1Lg7/z+XUpFi0ZJDU5gkjRsp1Ne0SNIzrGUWw5yuxP0gGmvAH
+DsV48QDNHbDLANyg0rejzrUk0pTGoAAwDgYKKwYBBAGtWQEDAQUAA0cAMEQCIE3k
+cgrf224sql7GP3+67cANI5BIgKhnpxFOGgTwfclVAiBNI/F7n6/j87dp07qWutmX
+CyQc97hBfoFRnJJVlA0hlg==
+-----END CERTIFICATE REQUEST-----
