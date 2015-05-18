@@ -111,9 +111,9 @@ public partial class Pub
 
     StringRow LRow;
     LRow.Index = 1;
-    foreach (String LLine in AText.Value.Split(ASeparator))
+    foreach (String LLine in AText.Value.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
     {
-      if (LLine.Length == 0) continue;
+      //if (LLine.Length == 0) continue;
       LRow.Value = LLine;
 
       if (LUnique.IndexOf(LLine.ToUpper()) >= 0)
@@ -150,9 +150,9 @@ public partial class Pub
 
     StringRowNamed LRow;
 	  LRow.Index = 1;
-    foreach (String LLine in AText.Value.Split(ASeparator))
+    foreach (String LLine in AText.Value.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
     {
-    if (LLine.Length == 0) continue;
+      //if (LLine.Length == 0) continue;
       String[] LSubLines = LLine.Split(new char[1]{'='}, 2);
       if (LSubLines.Length < 1) continue;
 
@@ -199,9 +199,9 @@ public partial class Pub
 
     StringRowNamed2 LRow;
     LRow.Index = 1;
-    foreach (String LLine in AText.Value.Split(ASeparator))
+    foreach (String LLine in AText.Value.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
     {
-      if (LLine.Length == 0) continue;
+      //if (LLine.Length == 0) continue;
       String[] LNames = LLine.Split(new Char[1]{'='}, 2);
       if (LNames.Length < 2) continue;
       LRow.Name = LNames[0];
@@ -259,9 +259,9 @@ public partial class Pub
 
     StringRowNamed3 LRow;
     LRow.Index = 1;
-    foreach (String LLine in AText.Value.Split(ASeparator))
+    foreach (String LLine in AText.Value.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
     {
-      if (LLine.Length == 0) continue;
+      //if (LLine.Length == 0) continue;
 
       String[] LNames = LLine.Split(new Char[1]{'='}, 2);
       if (LNames.Length < 2) continue;
@@ -323,13 +323,13 @@ public partial class Pub
   public static SqlString ExtractNamedValue(SqlString Text, SqlString Name, SqlChars Separator)
   {
       if (Text.IsNull || (Text.Value.ToString() == "") || Separator.IsNull) return null;
-      string[] lines = Text.Value.Split(Separator.Value);
+      String[] lines = Text.Value.Split(Separator.Value, StringSplitOptions.RemoveEmptyEntries);
 
       int i = 0;
-      foreach (string line in lines)
+      foreach (String line in lines)
       {
-        if (line == "") continue;
-        string[] sublines = line.Split("=".ToCharArray(), 2);
+        //if (line == "") continue;
+        String[] sublines = line.Split("=".ToCharArray(), 2);
         if (sublines[0].ToUpper() == Name.Value.ToUpper()) return (SqlString)sublines[1];
         i++;
       }
@@ -647,7 +647,7 @@ public partial class Pub
       return null;
   }
 
-	[SqlFunction(DataAccess = DataAccessKind.None, IsDeterministic = true)]
+	[SqlFunction(Name = "Arrays Positive Join", DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public static SqlBoolean ArraysPositiveJoin(SqlString AArray1, SqlString AArray2, Char ASeparator)
   {
     String
@@ -692,8 +692,35 @@ public partial class Pub
 
     return false;
   }
-}
 
+	[SqlFunction(Name = "Arrays Fully Included", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  public static SqlBoolean ArraysFullyIncluded(SqlString AArray, SqlString ASubArray, Char ASeparator)
+  {
+    String
+      LArray      = (AArray.IsNull ? null : AArray.Value),
+      LSubArray   = (ASubArray.IsNull ? null : ASubArray.Value);
+
+    if (String.IsNullOrEmpty(LSubArray) || LSubArray.Equals(ASeparator))
+      return true;
+
+    if (String.IsNullOrEmpty(LArray) || LArray.Equals(ASeparator))
+      return false;
+
+    if (LArray.Equals("*"))
+      return new SqlBoolean(true);
+    if (LSubArray.Equals("*"))
+      return new SqlBoolean(false);
+
+    LArray = ASeparator + LArray + ASeparator;
+    foreach(String LItem in LSubArray.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
+    {
+      if(LArray.IndexOf(ASeparator + LItem + ASeparator) == -1)
+        return false;
+    }
+
+    return true;
+  }
+}
 
 [Serializable]
 [SqlUserDefinedAggregate(Format.UserDefined, IsInvariantToNulls = true, IsInvariantToDuplicates = false, IsInvariantToOrder = false, MaxByteSize = -1)]
