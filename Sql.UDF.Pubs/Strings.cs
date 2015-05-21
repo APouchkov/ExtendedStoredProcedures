@@ -321,8 +321,9 @@ public class SQLParamsParser
           if (FCurrChar == LEndChar)
             if (FNextChar == LEndChar)
             {
-              SkipText(ref LPosition, false);
-              FPosition++;
+              MoveToNextChar();
+              //SkipText(ref LPosition, false);
+              //FPosition++;
             }
             else
             {

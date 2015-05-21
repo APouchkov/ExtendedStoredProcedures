@@ -109,7 +109,7 @@ public static class DynamicSQL
   }
 
   /// <summary>
-  /// Выполнение скалярного SQL-запроса
+  /// Выполнение SQL-запроса
   /// </summary>
   private static UDT.TParams InternalExecuteRow(String AQuery)
   {

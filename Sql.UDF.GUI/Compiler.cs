@@ -13,15 +13,18 @@ using Microsoft.SqlServer.Server;
 
 public partial class Compiler
 {
-  [SqlFunction(Name = "Compile", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static String Compile(String AText, UDT.TParams AParams, String AComments, Char ALiteral, String ATranslateScalar)
+  [SqlProcedure(Name = "Compile")]
+  public static void Compile(String AText, UDT.TParams AParams, String AComments, Char ALiteral, String ATranslateScalar, out SqlChars AResult)
   {
     if(String.IsNullOrWhiteSpace(AText))
-      return AText;
+    { 
+      AResult = null;
+      return;
+    }
 
     if(ATranslateScalar != null && ATranslateScalar.IndexOf("@Text") == -1)
       throw new Exception("Скалярный запрос на межязыковой перевод должен содержать параметр \"@Text\"");
-    return (new ScriptParser(AText, AParams, Pub.CommentMethodsParser(AComments), ALiteral, ATranslateScalar)).Text.ToString();
+    AResult = new SqlChars((new ScriptParser(AText, AParams, Pub.CommentMethodsParser(AComments), ALiteral, ATranslateScalar)).Text.ToString());
   }
 }
 
@@ -232,6 +235,39 @@ public class ScriptParser
             Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
           }
         }
+        else if(FCommand == "IMPORT")
+        {
+          byte LDepth;
+          String LStringFValue = FValue;
+          InternalDeepQuoteLevel(ref LStringFValue, out LDepth);
+
+          if(FSqlCommandOther == null)
+          {
+            FSqlCommandOther = FSqlConnection.CreateCommand();
+            FSqlCommandOther.CommandType = CommandType.Text;
+          }
+
+          FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(LStringFValue, FParams);
+          try
+          { 
+            using (SqlDataReader LSqlReader = FSqlCommandOther.ExecuteReader())
+            {
+              if (!LSqlReader.IsClosed && LSqlReader.Read())
+              { 
+                Object[] LValues = new object[LSqlReader.FieldCount];
+
+                LSqlReader.GetSqlValues(LValues);
+                for (int i = LSqlReader.FieldCount - 1; i >= 0; i--)
+                  FParams.AddParam(LSqlReader.GetName(i), LValues[i]);
+              }
+            }
+          }
+          catch(Exception E)
+          {
+            Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
+          }
+        }
+
         else if(FCommand == "SET")
         {
           int LEqual = FValue.IndexOf('=');
@@ -453,13 +489,13 @@ public class ScriptParser
             else break;
         }
 
-      if(!LInLiteral && FCurrChar == FLiteral)
-        LInLiteral = true;
-      else if(LInLiteral && FCurrChar == FLiteral)
-        if(FNextChar == FLiteral)
-          MoveToNextChar();
-        else
-          LInLiteral = false;
+        if(!LInLiteral && FCurrChar == FLiteral)
+          LInLiteral = true;
+        else if(/*!LWaitForCommand &&*/ LInLiteral && FCurrChar == FLiteral)
+          if(FNextChar == FLiteral)
+            MoveToNextChar();
+          else
+            LInLiteral = false;
 
       MoveToNextChar();
     }
