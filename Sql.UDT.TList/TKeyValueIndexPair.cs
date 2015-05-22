@@ -2,13 +2,13 @@
 using System.Collections.Generic;
 using System.Text;
 
-public struct KeyValueIndexPair<TKey, TValue>
+public struct KeyValueIndexPair<TKey, TValue, TIndex>
 {
   public TKey   Key;
   public TValue Value;
-  public Int32  Index;
+  public TIndex Index;
 
-  public KeyValueIndexPair(TKey key, TValue value, Int32 index)
+  public KeyValueIndexPair(TKey key, TValue value, TIndex index)
   {
     Key   = key;
     Value = value;

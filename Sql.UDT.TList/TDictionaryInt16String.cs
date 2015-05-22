@@ -12,10 +12,10 @@ using System.Text;
 //using System.Xml.Serialization;
 
 [Serializable]
-[SqlUserDefinedType(Microsoft.SqlServer.Server.Format.UserDefined, IsByteOrdered = true, MaxByteSize = -1, Name = "TDictionaryInt32String")]
-public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INullable
+[SqlUserDefinedType(Microsoft.SqlServer.Server.Format.UserDefined, IsByteOrdered = true, MaxByteSize = -1, Name = "TDictionaryInt16String")]
+public class TDictionaryInt16String: IBinarySerialize/*, IXmlSerializable*/, INullable
 {
-  public Dictionary<Int32,String> FList = new Dictionary<Int32,String>();
+  public Dictionary<Int16,String> FList = new Dictionary<Int16,String>();
 
   public override string ToString()
   {
@@ -23,7 +23,7 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
       return "";
 
     StringBuilder LResult = new StringBuilder(FList.Count * 2);
-    foreach(KeyValuePair<Int32,String> LKeyValuePair in FList)
+    foreach(KeyValuePair<Int16,String> LKeyValuePair in FList)
     {
       if(LResult.Length > 0)
         LResult.Append(';');
@@ -35,8 +35,8 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
     return LResult.ToString();
   }
 
-  public static TDictionaryInt32String Null { get { return new TDictionaryInt32String(); } }
-  public static TDictionaryInt32String New() { return Null; }
+  public static TDictionaryInt16String Null { get { return new TDictionaryInt16String(); } }
+  public static TDictionaryInt16String New() { return Null; }
 
   public bool IsNull { get { return false; } }
 
@@ -47,45 +47,45 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
     foreach (String LItem in AString.Split(';'))
     {
       int LIndex = LItem.IndexOf('=');
-      Int32   LName;
+      Int16   LName;
       String  LValue;
       if(LIndex != -1)
       {
-        LName  = Int32.Parse(LItem.Substring(0, LIndex));
+        LName  = Int16.Parse(LItem.Substring(0, LIndex));
         LValue = LItem.Substring(LIndex + 1);
       }
       else
       {
-        LName  = Int32.Parse(LItem);
+        LName  = Int16.Parse(LItem);
         LValue = null;
       }
       FList.Add(LName, LValue);
     }
   }
 
-  public static TDictionaryInt32String Parse(SqlString AString)
+  public static TDictionaryInt16String Parse(SqlString AString)
   {
     if (AString.IsNull) return null;
 
-    TDictionaryInt32String LResult = new TDictionaryInt32String();
+    TDictionaryInt16String LResult = new TDictionaryInt16String();
     LResult.FromString(AString.Value);
 
     return LResult;
  }
 
   [SqlMethod(Name = "Add", OnNullCall = false, IsMutator = true)]
-  public void Add(Int32 AName, String AValue) { FList.Add(AName, AValue); }
+  public void Add(Int16 AName, String AValue) { FList.Add(AName, AValue); }
 
   public int Length { get { return FList.Count; } }
 
   [SqlMethod(Name = "Values", OnNullCall = false, IsDeterministic = true)]
-  public SqlString Values(Int32 AName) { return FList[AName]; }
+  public SqlString Values(Int16 AName) { return FList[AName]; }
 
   [SqlMethod(Name = "Contains", OnNullCall = false, IsDeterministic = true)]
-  public Boolean Contains(Int32 AName) { return FList.ContainsKey(AName); }
+  public Boolean Contains(Int16 AName) { return FList.ContainsKey(AName); }
 
   [SqlMethod(Name = "Contains All", OnNullCall = false, IsDeterministic = true)]
-  public Boolean ContainsAll(TListInt32 AValue)
+  public Boolean ContainsAll(TListInt16 AValue)
   {
     if(AValue == null || AValue.FList.Count == 0)
       return true;
@@ -96,12 +96,12 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
     return true;
   }
 
-  public bool Equals(TDictionaryInt32String AList)
+  public bool Equals(TDictionaryInt16String AList)
   {
     if(AList == null || FList.Count != AList.FList.Count)
       return false;
 
-    foreach(KeyValuePair<Int32,String> LKeyPair in AList.FList)
+    foreach(KeyValuePair<Int16,String> LKeyPair in AList.FList)
     {
       if(FList[LKeyPair.Key] != LKeyPair.Value)
         return false;
@@ -113,14 +113,14 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
   public void Read(System.IO.BinaryReader r)
   {
 #if DEBUG
-    int LCount = r.ReadInt32();
+    int LCount = r.ReadInt16();
 #else    
     int LCount = Sql.Read7BitEncodedInt(r);
 #endif
 
     for(; LCount > 0; LCount--)
     {
-      Int32  LName  = r.ReadInt32();
+      Int16  LName  = r.ReadInt16();
       String LValue = r.ReadString();
       if(LValue.Length == 1 && LValue[0] == '\0')
         LValue = null;
@@ -137,7 +137,7 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
     Sql.Write7BitEncodedInt(w, LCount);
 #endif
 
-    foreach(KeyValuePair<Int32,String> LKeyPair in FList)
+    foreach(KeyValuePair<Int16,String> LKeyPair in FList)
     {
       w.Write(LKeyPair.Key);
       w.Write(LKeyPair.Value == null ? '\0'.ToString() : LKeyPair.Value);
@@ -145,48 +145,48 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
 
   }
 
-  [SqlFunction(Name = "Enum(Int32,String)", FillRowMethodName = "EnumRow", DataAccess = DataAccessKind.None, TableDefinition = "[Name] Int, [Value] NVarChar(4000), [Index] Int", IsDeterministic = true)]
-  public static IEnumerable Enum(TDictionaryInt32String ADictionary)
+  [SqlFunction(Name = "Enum(Int16,String)", FillRowMethodName = "EnumRow", DataAccess = DataAccessKind.None, TableDefinition = "[Name] Int, [Value] NVarChar(4000), [Index] Int", IsDeterministic = true)]
+  public static IEnumerable Enum(TDictionaryInt16String ADictionary)
   {
     if(ADictionary == null) yield break;
       
-    Int32 LIndex = 0;
-    foreach(KeyValuePair<Int32,String> LKeyPair in ADictionary.FList)
+    Int16 LIndex = 0;
+    foreach(KeyValuePair<Int16,String> LKeyPair in ADictionary.FList)
     { 
-      yield return new KeyValueIndexPair<Int32,String,Int32>(LKeyPair.Key, LKeyPair.Value, ++LIndex);
+      yield return new KeyValueIndexPair<Int16,String,Int32>(LKeyPair.Key, LKeyPair.Value, ++LIndex);
     }
   }
-  public static void EnumRow(object ARow, out Int32 AName, out String AValue, out Int32 AIndex)
+  public static void EnumRow(object ARow, out Int16 AName, out String AValue, out Int32 AIndex)
   {
-    AName  = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Key;
-    AValue = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Value;
-    AIndex = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Index;
+    AName  = ((KeyValueIndexPair<Int16,String,Int32>)ARow).Key;
+    AValue = ((KeyValueIndexPair<Int16,String,Int32>)ARow).Value;
+    AIndex = ((KeyValueIndexPair<Int16,String,Int32>)ARow).Index;
   }
 }
 
 [Serializable]
 [SqlUserDefinedAggregate(Format.UserDefined, IsInvariantToNulls = false, IsInvariantToDuplicates = false, IsInvariantToOrder = false, MaxByteSize = -1)]
-public class TDictionaryInt32StringAggregate: IBinarySerialize
+public class TDictionaryInt16StringAggregate: IBinarySerialize
 {
-  private TDictionaryInt32String OResult;
+  private TDictionaryInt16String OResult;
 
   public void Init()
   {
-    OResult = new TDictionaryInt32String();
+    OResult = new TDictionaryInt16String();
   }
 
-  public void Accumulate(Int32 AName, String AValue)
+  public void Accumulate(Int16 AName, String AValue)
   {
 		OResult.Add(AName, AValue);
   }
 
-  public void Merge(TDictionaryInt32StringAggregate AOther)
+  public void Merge(TDictionaryInt16StringAggregate AOther)
   {
-    foreach(KeyValuePair<Int32,String> LKeyPair in AOther.OResult.FList)
+    foreach(KeyValuePair<Int16,String> LKeyPair in AOther.OResult.FList)
       OResult.FList.Add(LKeyPair.Key, LKeyPair.Value);
   }
 
-  public TDictionaryInt32String Terminate()
+  public TDictionaryInt16String Terminate()
   {
     if (OResult != null && OResult.FList.Count > 0)
       return OResult;
@@ -198,7 +198,7 @@ public class TDictionaryInt32StringAggregate: IBinarySerialize
   {
     //if (r == null) throw new ArgumentNullException("r");
     if(OResult == null)
-      OResult = new TDictionaryInt32String();
+      OResult = new TDictionaryInt16String();
     OResult.Read(r);
   }
 

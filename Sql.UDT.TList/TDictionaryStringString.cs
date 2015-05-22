@@ -155,14 +155,14 @@ public class TDictionaryStringString: IBinarySerialize/*, IXmlSerializable*/, IN
     Int32 LIndex = 0;
     foreach(KeyValuePair<String,String> LKeyPair in ADictionary.FList)
     { 
-      yield return new KeyValueIndexPair<String,String>(LKeyPair.Key, LKeyPair.Value, ++LIndex);
+      yield return new KeyValueIndexPair<String,String,Int32>(LKeyPair.Key, LKeyPair.Value, ++LIndex);
     }
   }
   public static void EnumRow(object ARow, out String AName, out SqlString AValue, out Int32 AIndex)
   {
-    AName  = ((KeyValueIndexPair<String,String>)ARow).Key;
-    AValue = ((KeyValueIndexPair<String,String>)ARow).Value;
-    AIndex = ((KeyValueIndexPair<String,String>)ARow).Index;
+    AName  = ((KeyValueIndexPair<String,String,Int32>)ARow).Key;
+    AValue = ((KeyValueIndexPair<String,String,Int32>)ARow).Value;
+    AIndex = ((KeyValueIndexPair<String,String,Int32>)ARow).Index;
   }
 }
 

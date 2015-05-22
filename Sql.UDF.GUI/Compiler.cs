@@ -153,11 +153,16 @@ public class ScriptParser
       if(!ASkipText) Text.Append(FGap);
 
       if(!String.IsNullOrEmpty(FCommand))
-        if(FCommand == "IF")
+        if(FCommand == "IF" | FCommand == "IFDEF" || FCommand == "IFNDEF")
         {
           if(FBol) InternalSkipReturns();
 
-          Boolean LIfTrue = INT.TParams.EvaluateBoolean(FParams, FValue, false);
+          Boolean LIfTrue;
+          if(FCommand == "IF")
+            LIfTrue = INT.TParams.EvaluateBoolean(FParams, FValue, false);
+          else
+            LIfTrue = (FParams.Exists(FValue) == (FCommand == "IFDEF"));
+
           Boolean LElseFound = CallIF(TScriptParserWaitFor.Else | TScriptParserWaitFor.End, ASkipText | (!LIfTrue));
           if(LElseFound) CallIF(TScriptParserWaitFor.End, ASkipText | LIfTrue);
         }

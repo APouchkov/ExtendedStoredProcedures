@@ -89,6 +89,8 @@
     <Compile Include="TDictionaryStringInt32.cs" />
     <Compile Include="TKeyValueIndexPair.cs" />
     <Compile Include="TDictionaryInt32String.cs" />
+    <Compile Include="TDictionaryInt16String.cs" />
+    <Compile Include="TDictionaryStringInt16.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Test Scripts\" />

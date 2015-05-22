@@ -815,9 +815,9 @@ namespace UDT
     }
     public static void TDictionaryStringStringEnumRow(object ARow, out String AKey, out String AValue, out Int32 AIndex)
     {
-      AKey   = ((KeyValueIndexPair<String,String>)ARow).Key;
-      AValue = ((KeyValueIndexPair<String,String>)ARow).Value;
-      AIndex = ((KeyValueIndexPair<String,String>)ARow).Index;
+      AKey   = ((KeyValueIndexPair<String,String,Int32>)ARow).Key;
+      AValue = ((KeyValueIndexPair<String,String,Int32>)ARow).Value;
+      AIndex = ((KeyValueIndexPair<String,String,Int32>)ARow).Index;
     }
 
 
@@ -840,9 +840,9 @@ namespace UDT
     }
     public static void TDictionaryStringInt32EnumRow(object ARow, out String AKey, out Int32 AValue, out Int32 AIndex)
     {
-      AKey   = ((KeyValueIndexPair<String,Int32>)ARow).Key;
-      AValue = ((KeyValueIndexPair<String,Int32>)ARow).Value;
-      AIndex = ((KeyValueIndexPair<String,Int32>)ARow).Index;
+      AKey   = ((KeyValueIndexPair<String,Int32,Int32>)ARow).Key;
+      AValue = ((KeyValueIndexPair<String,Int32,Int32>)ARow).Value;
+      AIndex = ((KeyValueIndexPair<String,Int32,Int32>)ARow).Index;
     }
 
     /// <summary>
@@ -864,9 +864,9 @@ namespace UDT
     }
     public static void TDictionaryInt32StringEnumRow(object ARow, out Int32 AKey, out String AValue, out Int32 AIndex)
     {
-      AKey   = ((KeyValueIndexPair<Int32,String>)ARow).Key;
-      AValue = ((KeyValueIndexPair<Int32,String>)ARow).Value;
-      AIndex = ((KeyValueIndexPair<Int32,String>)ARow).Index;
+      AKey   = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Key;
+      AValue = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Value;
+      AIndex = ((KeyValueIndexPair<Int32,String,Int32>)ARow).Index;
     }
   }
 

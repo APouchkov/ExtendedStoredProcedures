@@ -112,8 +112,6 @@ public class TListInt32: IBinarySerialize/*, IXmlSerializable*/, INullable
     Sql.Write7BitEncodedInt(w, LCount);
 #endif
 
-    //foreach(int LValue in FList)
-    //  w.Write(LValue);
     for(int LIndex = 0; LIndex < LCount; LIndex++)
       w.Write(FList[LIndex]);
   }
