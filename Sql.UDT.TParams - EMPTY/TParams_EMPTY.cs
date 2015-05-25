@@ -2191,6 +2191,11 @@ namespace UDT_EMPTY
         {
           base.AddParam(name, value);
         }
+        [SqlMethod(Name = "Evaluate", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read)]
+        public object Evaluate(String AExpression)
+        {
+          return null;
+        }
 
 
         /// <summary>
