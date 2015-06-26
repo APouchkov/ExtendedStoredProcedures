@@ -46,6 +46,38 @@ public class Sql
     throw new Exception("Wrong System.IO.BinaryReader.Read7BitEncodedInt");
   }
 
+  public static void Write7BitEncodedInt64(System.IO.BinaryWriter w, Int64 IValue)  
+  {  
+    UInt64 num = (UInt32)IValue;  
+  
+    while (num >= 128U)  
+    {  
+      w.Write((byte) (num | 128U));  
+      num >>= 7;  
+    }  
+  
+    w.Write((byte) num);  
+  }
+  
+  public static Int64 Read7BitEncodedInt64(System.IO.BinaryReader r)  
+  {  
+    // some names have been changed to protect the readability  
+    Int64 returnValue = 0;  
+    int   bitIndex    = 0;  
+  
+    while (bitIndex != 70)  
+    {  
+      byte currentByte = r.ReadByte();  
+      returnValue |= ((Int64) currentByte & (Int64) sbyte.MaxValue) << bitIndex;  
+      bitIndex += 7;  
+  
+      if (((Int64) currentByte & 128) == 0)  
+        return returnValue;  
+    }  
+  
+    throw new Exception("Wrong System.IO.BinaryReader.Read7BitEncodedInt64");
+  }
+
 /* // SqlAnsiString
   public struct SqlAnsiString
   {

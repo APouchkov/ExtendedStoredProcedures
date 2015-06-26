@@ -153,7 +153,10 @@ public class ScriptParser
       if(!ASkipText) Text.Append(FGap);
 
       if(!String.IsNullOrEmpty(FCommand))
-        if(FCommand == "IF" | FCommand == "IFDEF" || FCommand == "IFNDEF")
+      { 
+        // SqlContext.Pipe.Send("Command: " + FCommand + ", ASkipText = " + ASkipText.ToString());
+
+        if(FCommand == "IF" || FCommand == "IFDEF" || FCommand == "IFNDEF")
         {
           if(FBol) InternalSkipReturns();
 
@@ -163,8 +166,13 @@ public class ScriptParser
           else
             LIfTrue = (FParams.Exists(FValue) == (FCommand == "IFDEF"));
 
-          Boolean LElseFound = CallIF(TScriptParserWaitFor.Else | TScriptParserWaitFor.End, ASkipText | (!LIfTrue));
-          if(LElseFound) CallIF(TScriptParserWaitFor.End, ASkipText | LIfTrue);
+          // SqlContext.Pipe.Send("IF: LIfTrue = " + LIfTrue.ToString() + ", ASkipText = " + ASkipText.ToString());
+
+          Boolean LElseFound = CallIF(TScriptParserWaitFor.Else | TScriptParserWaitFor.End, ASkipText || (!LIfTrue));
+
+          // SqlContext.Pipe.Send("IF: LElseFound = " + LElseFound.ToString());
+
+          if(LElseFound) CallIF(TScriptParserWaitFor.End, ASkipText || LIfTrue);
         }
         else if(FCommand == "END" || FCommand == "ENDIF" || FCommand == "IFEND")
         {
@@ -172,19 +180,23 @@ public class ScriptParser
 
           if((AWaitFor & TScriptParserWaitFor.End) == 0)
             Exception("Найдена инструкция {$END} без предшествующей ей инструкции {$IF}");
+
+          // SqlContext.Pipe.Send("END");
+
           return false;
         }
-        else if(ASkipText)
-          continue;
-
         else if(FCommand == "ELSE")
         {
           if(FBol) InternalSkipReturns();
+
+          // SqlContext.Pipe.Send("ELSE");
 
           if((AWaitFor & TScriptParserWaitFor.Else) == 0)
             Exception("Найдена инструкция {$ELSE} без предшествующей ей инструкции {$IF}");
           return true;
         }
+        else if(ASkipText)
+          continue;
         else if(FCommand == "I" || FCommand == "INCLUDE")
         {
           byte LDepth;
@@ -292,7 +304,7 @@ public class ScriptParser
         }
         else
           Exception("Найдена неизвестная инструкция {$" + FCommand + "}");
-
+      }
     }
 
     if((AWaitFor & TScriptParserWaitFor.End) != 0)

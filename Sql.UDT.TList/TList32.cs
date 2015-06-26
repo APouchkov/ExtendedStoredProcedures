@@ -43,6 +43,10 @@ public class TListInt32: IBinarySerialize/*, IXmlSerializable*/, INullable
       FList.Add(Int32.Parse(LItem));
   }
 
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "Parse", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)
+  ]
   public static TListInt32 Parse(SqlString AString)
   {
     if (AString.IsNull) return null;
@@ -53,18 +57,37 @@ public class TListInt32: IBinarySerialize/*, IXmlSerializable*/, INullable
     return LResult;
   }
 
-  [SqlMethod(Name = "Add", OnNullCall = false, IsMutator = true)]
+  [SqlMethod(Name = "Add", OnNullCall = false, DataAccess = DataAccessKind.None, IsMutator = true)]
   public void Add(Int32 AValue) { FList.Add(AValue); }
 
   public int Length { get { return FList.Count; } }
 
-  [SqlMethod(Name = "Values", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Values", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Int32 Values(int AIndex) { return FList[AIndex - 1]; }
 
-  [SqlMethod(Name = "Contains", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Contains", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean Contains(Int32 AValue) { return FList.Contains(AValue); }
 
-  [SqlMethod(Name = "Contains All", OnNullCall = false, IsDeterministic = true)]
+  [SqlFunction(Name = "TList.<Int32>::BinaryContains", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  public static Boolean BinaryContains(SqlBytes AData, Int32 AValue)
+  {
+    if(AData.IsNull) return false;
+
+    System.IO.BinaryReader r = new System.IO.BinaryReader(new System.IO.MemoryStream(AData.Buffer));
+
+#if DEBUG
+    int LCount = r.ReadInt32();
+#else    
+    int LCount = Sql.Read7BitEncodedInt(r);
+#endif
+
+    for(; LCount > 0; LCount--)
+      if(r.ReadInt32() == AValue) return true;
+
+    return false;
+ }
+
+  [SqlMethod(Name = "Contains All", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean ContainsAll(TListInt32 AValue)
   {
     if(AValue == null || AValue.FList.Count == 0)
@@ -85,6 +108,54 @@ public class TListInt32: IBinarySerialize/*, IXmlSerializable*/, INullable
         return false;
 
     return true;
+  }
+
+
+  [SqlMethod(Name = "ToCompressedBinary", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  public SqlBytes ToCompressedBinary()
+  {
+    if(FList == null || FList.Count == 0)
+      return null;
+
+    System.IO.MemoryStream s = new System.IO.MemoryStream();
+    System.IO.BinaryWriter w = new System.IO.BinaryWriter(s);
+
+    int LCount = FList.Count;
+    Sql.Write7BitEncodedInt(w, LCount);
+
+    for(int LIndex = 0; LIndex < LCount; LIndex++)
+      Sql.Write7BitEncodedInt(w, FList[LIndex]);
+
+    return new SqlBytes(s);
+  }
+
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "FromCompressedBinary", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)
+  ]
+  public static TListInt32 FromCompressedBinary(SqlBytes AData)
+  {
+    if (AData.IsNull) return TListInt32.Null;
+
+    TListInt32 LResult = new TListInt32();
+    System.IO.BinaryReader r = new System.IO.BinaryReader(AData.Stream);
+
+    int LCount = Sql.Read7BitEncodedInt(r);
+
+    LResult.FList.Capacity = LCount;
+    for(; LCount > 0; LCount--)
+      LResult.FList.Add(Sql.Read7BitEncodedInt(r));
+
+    return LResult;
+  }
+
+  [SqlFunction(Name = "TList.Is Equal<Int32>", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  public static bool IsEqual(TListInt32 AList1, TListInt32 AList2)
+  {
+    if (AList1 == null && AList2 == null) return true;
+    if (AList1 == null || AList2 == null) return false;
+
+    return AList1.Equals(AList2);
   }
 
   public void Read(System.IO.BinaryReader r)
@@ -145,12 +216,12 @@ public class TListInt32Aggregate: IBinarySerialize
     OResult = new TListInt32();
   }
 
-  public void Accumulate(Int32 AValue)
+  public void Accumulate(SqlInt32 AValue)
   {
-    //if (AValue.IsNull) 
-    //  return;
+    if (AValue.IsNull) 
+      return;
 
-		OResult.Add(AValue);
+		OResult.Add(AValue.Value);
   }
 
   public void Merge(TListInt32Aggregate AOther)

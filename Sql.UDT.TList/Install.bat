@@ -7,7 +7,7 @@ GOTO ERROR
 
 :NEXT1
 REM Заливаем сборку на сервер
-REM Sqlcmd -S "SRV-DEV01" -d "BackOffice" -E -b -i "Install.sql"
+REM Sqlcmd -S "BD-VM-DV-CIS" -d "BackOffice" -E -b -i "Install.sql"
 REM if not ERRORLEVEL 1 goto :OK
 
 :ERROR 
@@ -15,5 +15,6 @@ pause
 GOTO EXIT
 
 :OK
+pause
 
 :EXIT

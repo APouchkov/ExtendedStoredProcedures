@@ -47,6 +47,10 @@ public class TListInt16: IBinarySerialize/*, IXmlSerializable*/, INullable
       FList.Add(Int16.Parse(LItem));
   }
 
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "Parse", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)
+  ]
   public static TListInt16 Parse(SqlString AString)
   {
     if (AString.IsNull) return null;
@@ -57,18 +61,18 @@ public class TListInt16: IBinarySerialize/*, IXmlSerializable*/, INullable
     return LResult;
   }
 
-  [SqlMethod(Name = "Add", OnNullCall = false, IsMutator = true)]
+  [SqlMethod(Name = "Add", OnNullCall = false, DataAccess = DataAccessKind.None, IsMutator = true)]
   public void Add(Int16 AValue) { FList.Add(AValue); }
 
   public int Length { get { return FList.Count; } }
 
-  [SqlMethod(Name = "Values", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Values", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Int16 Values(int AIndex) { return FList[AIndex - 1]; }
 
-  [SqlMethod(Name = "Contains", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Contains", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean Contains(Int16 AValue) { return FList.Contains(AValue); }
 
-  [SqlMethod(Name = "Contains All", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Contains All", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean ContainsAll(TListInt16 AValue)
   {
     if(AValue == null || AValue.FList.Count == 0)

@@ -51,6 +51,10 @@ public class TDictionaryStringInt32: IBinarySerialize/*, IXmlSerializable*/, INu
     }
   }
 
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "Parse", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)
+  ]
   public static TDictionaryStringInt32 Parse(SqlString AString)
   {
     if (AString.IsNull) return null;
@@ -61,18 +65,18 @@ public class TDictionaryStringInt32: IBinarySerialize/*, IXmlSerializable*/, INu
     return LResult;
  }
 
-  [SqlMethod(Name = "Add", OnNullCall = false, IsMutator = true)]
+  [SqlMethod(Name = "Add", OnNullCall = false, DataAccess = DataAccessKind.None, IsMutator = true)]
   public void Add(String AName, Int32 AValue) { FList.Add(AName, AValue); }
 
   public int Length { get { return FList.Count; } }
 
-  [SqlMethod(Name = "Values", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Values", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public SqlInt32 Values(String AName) { return FList[AName]; }
 
-  [SqlMethod(Name = "Contains", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Contains", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean Contains(String AName) { return FList.ContainsKey(AName); }
 
-  [SqlMethod(Name = "Contains All", OnNullCall = false, IsDeterministic = true)]
+  [SqlMethod(Name = "Contains All", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)]
   public Boolean ContainsAll(TListString AValue)
   {
     if(AValue == null || AValue.FList.Count == 0)
