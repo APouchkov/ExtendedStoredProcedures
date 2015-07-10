@@ -72,7 +72,7 @@ public class ScriptParser
 
   public void Exception(String AInstruction)
   {
-    throw new Exception("Ошибка в строке " + FLine.ToString() + ": " + AInstruction);
+    throw new Exception("Ошибка препроцессорной компиляции в строке " + FLine.ToString() + ": " + AInstruction);
   }
 
   private enum TScriptParserWaitFor: byte { None = 0, Else = 1, End = 2 };
@@ -110,7 +110,7 @@ public class ScriptParser
       FSqlConnection.Open();
     }
 
-    CallIF(TScriptParserWaitFor.None, false);
+    CallIF();
   }
 
   private static void InternalDeepQuoteLevel(ref String AString, out byte ADepth)
@@ -145,34 +145,40 @@ public class ScriptParser
     }
   }
 
-  // Возвращает TRUE, если найден ELSE
-  private Boolean CallIF(TScriptParserWaitFor AWaitFor, Boolean ASkipText)
+  private Char[] LSpaces = new Char[3] {' ', '\r', '\n'};
+
+  private Boolean InternalCallIF()
   {
+    if(FBol) InternalSkipReturns();
+
+    if(FCommand == "IF")
+      return INT.TParams.EvaluateBoolean(FParams, FValue, false);
+    else
+      return (FParams.Exists(FValue) == (FCommand == "IFDEF"));
+  }
+
+  // Возвращает TRUE, если найден ELSE
+  private void CallIF(TScriptParserWaitFor AWaitFor = TScriptParserWaitFor.None, Boolean ASkipText = false, Boolean AParentSkipText = false)
+  {
+    Boolean LSkipText = ASkipText;
+    Boolean LElseIfCompleted = (AWaitFor != TScriptParserWaitFor.None && !ASkipText && !AParentSkipText);
+
     while (MoveNext())
     {
-      if(!ASkipText) Text.Append(FGap);
+      if(!LSkipText) Text.Append(FGap);
 
       if(!String.IsNullOrEmpty(FCommand))
       { 
-        // SqlContext.Pipe.Send("Command: " + FCommand + ", ASkipText = " + ASkipText.ToString());
+        //SqlContext.Pipe.Send("Command: " + FCommand + ", FValue = " + FValue + ", AWaitFor = " + AWaitFor.ToString() + ", LSkipText = " + LSkipText.ToString() + ", LElseIfCompleted = " + LElseIfCompleted.ToString());
 
         if(FCommand == "IF" || FCommand == "IFDEF" || FCommand == "IFNDEF")
         {
-          if(FBol) InternalSkipReturns();
+          Boolean LIfTrue = InternalCallIF();
 
-          Boolean LIfTrue;
-          if(FCommand == "IF")
-            LIfTrue = INT.TParams.EvaluateBoolean(FParams, FValue, false);
-          else
-            LIfTrue = (FParams.Exists(FValue) == (FCommand == "IFDEF"));
-
-          // SqlContext.Pipe.Send("IF: LIfTrue = " + LIfTrue.ToString() + ", ASkipText = " + ASkipText.ToString());
-
-          Boolean LElseFound = CallIF(TScriptParserWaitFor.Else | TScriptParserWaitFor.End, ASkipText || (!LIfTrue));
+          // SqlContext.Pipe.Send("IF: LIfTrue = " + LIfTrue.ToString() + ", LSkipText = " + LSkipText.ToString());
+          CallIF(TScriptParserWaitFor.Else | TScriptParserWaitFor.End, LSkipText || (!LIfTrue), ASkipText);
 
           // SqlContext.Pipe.Send("IF: LElseFound = " + LElseFound.ToString());
-
-          if(LElseFound) CallIF(TScriptParserWaitFor.End, ASkipText || LIfTrue);
         }
         else if(FCommand == "END" || FCommand == "ENDIF" || FCommand == "IFEND")
         {
@@ -183,19 +189,61 @@ public class ScriptParser
 
           // SqlContext.Pipe.Send("END");
 
-          return false;
+          return;
         }
         else if(FCommand == "ELSE")
         {
           if(FBol) InternalSkipReturns();
 
-          // SqlContext.Pipe.Send("ELSE");
+          // SqlContext.Pipe.Send("ELSE " + FValue);
 
           if((AWaitFor & TScriptParserWaitFor.Else) == 0)
             Exception("Найдена инструкция {$ELSE} без предшествующей ей инструкции {$IF}");
-          return true;
+  
+          if(FValue.Length > 0)
+          {
+            int LSpace = FValue.IndexOfAny(LSpaces); 
+            if(LSpace > 0)
+            {
+              FCommand = FValue.Substring(0, LSpace);
+              FValue = FValue.Substring(LSpace + 1);
+            }
+            else
+            {
+              FCommand = FValue;
+              FValue   = "";
+            }
+
+            if(!LElseIfCompleted && !AParentSkipText)
+            { 
+              if(FCommand == "IF" || FCommand == "IFDEF" || FCommand == "IFNDEF")
+              {
+                LElseIfCompleted = InternalCallIF();
+                if(LElseIfCompleted)
+                  LSkipText = false;
+              }
+              else
+                Exception("Неизвестная инструкция {$ELSE " + FCommand + '}');
+            }
+            else if(LElseIfCompleted && !LSkipText)
+            { 
+              LSkipText = true;
+              //SqlContext.Pipe.Send(">> ELSEIF SET LSkipText = " + LSkipText.ToString());
+            }
+
+            //continue;
+          }
+          else
+          { 
+            AWaitFor ^= TScriptParserWaitFor.Else;
+            LSkipText = LElseIfCompleted || AParentSkipText;
+            //SqlContext.Pipe.Send(">> ELSE SET LSkipText = " + LSkipText.ToString());
+          }
+
+          //return true;
+          continue;
         }
-        else if(ASkipText)
+        else if(LSkipText)
           continue;
         else if(FCommand == "I" || FCommand == "INCLUDE")
         {
@@ -302,6 +350,10 @@ public class ScriptParser
         {
           InternalSkipReturns();
         }
+        else if(FCommand == "EXCEPTION")
+        {
+          Exception(String.IsNullOrWhiteSpace(FValue) ? "Abstract error" : FValue);
+        }
         else
           Exception("Найдена неизвестная инструкция {$" + FCommand + "}");
       }
@@ -310,7 +362,7 @@ public class ScriptParser
     if((AWaitFor & TScriptParserWaitFor.End) != 0)
       Exception("Конец сценария достигнут, хотя ожидается инструкция {$END}");
 
-    return false;
+//    return false;
   }
 
   // Разбор текста
@@ -350,7 +402,6 @@ public class ScriptParser
     LPosition = FPosition + 1;
   }
 
-  private Char[] LSpaces = new Char[3] {' ', '\r', '\n'};
   public Boolean MoveNext()
   {
 

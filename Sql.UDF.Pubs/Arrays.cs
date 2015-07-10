@@ -648,7 +648,7 @@ public partial class Pub
   }
 
 	[SqlFunction(Name = "Arrays Positive Join", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static SqlBoolean ArraysPositiveJoin(SqlString AArray1, SqlString AArray2, Char ASeparator)
+  public static Boolean ArraysPositiveJoin(SqlString AArray1, SqlString AArray2, Char ASeparator)
   {
     String
       LArray1      = (AArray1.IsNull ? null : AArray1.Value),
@@ -663,9 +663,9 @@ public partial class Pub
         return false;
 
     if (LArray1.Equals("*"))
-      return new SqlBoolean(true);
+      return true;
     if (LArray2.Equals("*"))
-      return new SqlBoolean(true);
+      return true;
 
     LArray2 = ASeparator + LArray2 + ASeparator;
 

@@ -4,31 +4,26 @@ using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using Microsoft.SqlServer.Server;
 using System.Text;
+using System.Linq;
+using System.Collections;
+using System.Collections.Generic;
 
-[Serializable]
-[SqlUserDefinedType(Microsoft.SqlServer.Server.Format.UserDefined, IsByteOrdered = true, MaxByteSize = -1, Name = "TPrivileges")]
-public struct TPrivileges: INullable, IBinarySerialize
+public class Pub
 {
-  public SqlBytes Select;
-  public SqlBytes Insert;
-  public SqlBytes Update;
-  public SqlBytes Initialize;
-  public SqlBytes Delete;
-
-  private static void Write7BitEncodedInt(System.IO.BinaryWriter w, Int32 IValue)  
+  public static void Write7BitEncodedInt(System.IO.BinaryWriter w, Int32 IValue)  
   {  
-    UInt32 num = (UInt32)IValue;  
+    UInt32 num    = (UInt32)IValue;  
   
     while (num >= 128U)  
     {  
       w.Write((byte) (num | 128U));  
-      num >>= 7;  
+      num >>= 7;
     }  
   
-    w.Write((byte) num);  
+    w.Write((byte) num);
   }
   
-  private static Int32 Read7BitEncodedInt(System.IO.BinaryReader r)  
+  public static Int32 Read7BitEncodedInt(System.IO.BinaryReader r)  
   {  
     // some names have been changed to protect the readability  
     Int32 returnValue = 0;  
@@ -46,235 +41,314 @@ public struct TPrivileges: INullable, IBinarySerialize
   
     throw new Exception("Wrong System.IO.BinaryReader.Read7BitEncodedInt");
   }
+}
 
-  public void ItemToString(StringBuilder AResult,  SqlBytes AItem)
+// <TYPE>(1) <SIZE>{1-5} <DATA>
+
+[Serializable]
+[SqlUserDefinedAggregate(Format.UserDefined, IsInvariantToNulls = false, IsInvariantToDuplicates = false, IsInvariantToOrder = false, MaxByteSize = -1)]
+public class TPrivilegesObjectAggregate: IBinarySerialize
+{
+  private Dictionary<Char, System.IO.BinaryWriter> OResult;
+
+  public void Init()
   {
-    if(AResult.Length > 0)
-      AResult.Append(';');
-
-    if(!AItem.IsNull && AItem.Length > 0)
-    { 
-      System.IO.BinaryReader r = new System.IO.BinaryReader(new System.IO.MemoryStream(AItem.Buffer));
-      int LCount = Read7BitEncodedInt(r);
-
-      for(int LIndex = 0; LIndex < LCount; LIndex++)
-      { 
-        if(LIndex > 0)
-          AResult.Append(',');
-        AResult.Append(Read7BitEncodedInt(r));
-      }
-    }
+    OResult = new Dictionary<Char, System.IO.BinaryWriter>();
   }
 
-  public override string ToString()
+  public void Accumulate(Char AType, Int32 AValue)
   {
-    StringBuilder LResult = new StringBuilder();
-
-    ItemToString(LResult, Select);
-    ItemToString(LResult, Insert);
-    ItemToString(LResult, Update);
-    ItemToString(LResult, Initialize);
-    ItemToString(LResult, Delete);
-
-    return LResult.ToString();
-  }
-
-  [
-    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
-    SqlMethod(Name = "Parse", OnNullCall = false, IsDeterministic = true)
-  ]
-  public static TPrivileges Parse(SqlString AString)
-  {
-    //if (AString.IsNull) return null;
-
-    //TPrivileges LResult = new TPrivileges();
-    //LResult.FromString(AString.Value);
-
-    return TPrivileges.Null; //LResult;
-  }
-
-  public bool IsNull
-  {
-    get
+    System.IO.BinaryWriter w;
+    if(!OResult.TryGetValue(AType, out w))
     {
-      // Поместите здесь свой код
-      return false;
+      System.IO.MemoryStream s = new System.IO.MemoryStream();
+      w = new System.IO.BinaryWriter(s);
+		  OResult.Add(AType, w);
+    }
+    Pub.Write7BitEncodedInt(w, AValue);
+  }
+
+  public void Merge(TPrivilegesObjectAggregate AOther)
+  {
+    foreach(KeyValuePair<Char, System.IO.BinaryWriter> LKeyPair in AOther.OResult)
+    { 
+      System.IO.BinaryReader r = new System.IO.BinaryReader(LKeyPair.Value.BaseStream);
+      System.IO.BinaryWriter w;
+
+      if(!OResult.TryGetValue(LKeyPair.Key, out w))
+      {
+        System.IO.MemoryStream s = new System.IO.MemoryStream();
+        w = new System.IO.BinaryWriter(s);
+		    OResult.Add(LKeyPair.Key, w);
+      }
+      w.Write(((System.IO.MemoryStream)LKeyPair.Value.BaseStream).ToArray());
     }
   }
 
-  public static TPrivileges New()
+  public SqlBytes Terminate()
   {
-      return Null;
+    if (OResult == null || OResult.Count == 0)
+      return SqlBytes.Null;
+
+    System.IO.MemoryStream s = new System.IO.MemoryStream();
+    System.IO.BinaryWriter w = new System.IO.BinaryWriter(s);
+    Write(w);
+    return new SqlBytes(s);
   }
 
-  public static TPrivileges Create(SqlBytes ASelect, SqlBytes AInsert, SqlBytes AUpdate, SqlBytes AInitialize, SqlBytes ADelete)
+  public void Write(System.IO.BinaryWriter w)
   {
-    TPrivileges h = new TPrivileges();
-    h.Select      = ASelect;
-    h.Insert      = AInsert;
-    h.Update      = AUpdate;
-    h.Initialize  = AInitialize;
-    h.Delete      = ADelete;
+    foreach(KeyValuePair<Char, System.IO.BinaryWriter> LKeyPair in OResult)
+    {
+      System.IO.MemoryStream s = (System.IO.MemoryStream)(LKeyPair.Value.BaseStream);
 
-    return h;
+      w.Write(LKeyPair.Key);
+      Pub.Write7BitEncodedInt(w, (Int32)(s.Length));
+      w.Write(s.ToArray());
+    }
+  }
+
+  public void Read(System.IO.BinaryReader r)
+  {
+    Init();
+
+    Char  LType;
+    Int32 LLength;
+
+    while(r.BaseStream.Position < r.BaseStream.Length)
+    {
+      System.IO.MemoryStream s = new System.IO.MemoryStream();
+      System.IO.BinaryWriter w = new System.IO.BinaryWriter(s);
+
+      LType   = r.ReadChar();  
+      LLength = Pub.Read7BitEncodedInt(r);
+      w.Write(r.ReadBytes(LLength));
+
+      OResult.Add(LType, w);
+    }
+  }
+}
+
+////////////////////////////////////////////////////////////////
+// <TYPE>(1) <SIZE>{1-5} <ROLES>
+// <SIZE>{1-5} <OBJECT_ID>{1-5} <PRIVILEGES> | <SIZE>{1-5} <OBJECT_ID>{1-5} <PRIVILEGES>
+
+
+[Serializable]
+[SqlUserDefinedType(Microsoft.SqlServer.Server.Format.UserDefined, IsByteOrdered = true, MaxByteSize = -1, Name = "TPrivileges")]
+public struct TPrivileges: INullable, IBinarySerialize
+{
+  public Dictionary<Int32, Byte[]> FData;
+
+  public TPrivileges(Boolean AInit = false)
+  {
+    if(AInit)
+      FData = new Dictionary<Int32, Byte[]>();
+    else
+      FData = null;
   }
 
   public static TPrivileges Null
   {
     get
     {
-      TPrivileges h = new TPrivileges();
-
-      h.Select      = SqlBytes.Null;
-      h.Insert      = SqlBytes.Null;
-      h.Update      = SqlBytes.Null;
-      h.Initialize  = SqlBytes.Null;
-      h.Delete      = SqlBytes.Null;
-
-      return h;
+      return new TPrivileges(false);
     }
   }
-
-
-  public bool ItemsEqual(SqlBytes AItem1, SqlBytes AItem2)
+  public static TPrivileges New()
   {
-    if(AItem1.IsNull && AItem2.IsNull)
-      return true;
-
-    if(AItem1.IsNull || AItem2.IsNull)
-      return false;
-
-    //return AItem1.Equals(AItem2);
-
-    if(AItem1.Length != AItem2.Length)
-      return false;
-
-    for(int i = (int)(AItem1.Length) - 1; i >= 0; i--)
-      if(AItem1.Buffer[i] != AItem2.Buffer[i])
-        return false;
-
-    return true;
+    return new TPrivileges(true);
   }
 
-  public bool Equals(TPrivileges arg)
+  public override string ToString()
   {
-    return ItemsEqual(Select, arg.Select) && ItemsEqual(Insert, arg.Insert) && ItemsEqual(Update, arg.Update) && ItemsEqual(Initialize, arg.Initialize) && ItemsEqual(Delete, arg.Delete);
+    StringBuilder LResult = new StringBuilder();
+
+    foreach(KeyValuePair<Int32, Byte[]> LKeyPair in FData)
+    {
+      if(LResult.Length > 0)
+        LResult.Append(';');  
+
+      System.IO.MemoryStream s = new System.IO.MemoryStream(LKeyPair.Value);
+      System.IO.BinaryReader r = new System.IO.BinaryReader(s);
+
+      while(s.Position < s.Length)
+      {
+        if(s.Position > 0)
+          LResult.Append('|');
+
+        Char  LPrivilege = r.ReadChar();
+        Int32 LEndPos    = Pub.Read7BitEncodedInt(r) + (Int32)s.Position;
+
+        for(Boolean LNeedDelim = false; s.Position < LEndPos;)
+        { 
+          if(LNeedDelim)
+            LResult.Append(',');
+          else
+            LNeedDelim = true;
+          LResult.Append(Pub.Read7BitEncodedInt(r));
+        }
+      }
+    }
+
+    return LResult.ToString();
   }
 
-  
-  [SqlFunction(Name = "TPrivileges.Is Equal", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static bool IsEqual(TPrivileges Item1, TPrivileges Item2)
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "Parse", OnNullCall = false, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)
+  ]
+  public static TPrivileges Parse(SqlString AString)
   {
-    return Item1.Equals(Item2);
+    // НЕ РЕАЛИЗОВАННО !!!!!!
+    return new TPrivileges(false);
+  }
+
+  public bool IsNull
+  {
+    get
+    {
+      // НЕ РЕАЛИЗОВАННО !!!!!!
+      return (FData == null);
+    }
   }
 
   public void Write(System.IO.BinaryWriter w)
   {
-    if(Select.IsNull)
-      w.Write((Byte)0);
-    else
-    { 
-      Write7BitEncodedInt(w, (Int32)Select.Length);
-      if(Select.Length > 0)
-        w.Write(Select.Buffer, 0, (Int32)(Select.Length));
-    }
+    System.IO.Stream  LStream = w.BaseStream;
 
-    if(Insert.IsNull)
-      w.Write((Byte)0);
-    else
-    { 
-      Write7BitEncodedInt(w, (Int32)Insert.Length);
-      if(Insert.Length > 0)
-        w.Write(Insert.Buffer, 0, (Int32)(Insert.Length));
-    }
-
-    if(Update.IsNull)
-      w.Write((Byte)0);
-    else
-    { 
-      Write7BitEncodedInt(w, (Int32)Update.Length);
-      if(Update.Length > 0)
-        w.Write(Update.Buffer, 0, (Int32)(Update.Length));
-    }
-
-    if(Initialize.IsNull)
-      w.Write((Byte)0);
-    else
-    { 
-      Write7BitEncodedInt(w, (Int32)Initialize.Length);
-      if(Initialize.Length > 0)
-        w.Write(Initialize.Buffer, 0, (Int32)(Initialize.Length));
-    }
-
-    if(Delete.IsNull)
-      w.Write((Byte)0);
-    else
-    { 
-      Write7BitEncodedInt(w, (Int32)Delete.Length);
-      if(Delete.Length > 0)
-        w.Write(Delete.Buffer, 0, (Int32)(Delete.Length));
+    foreach(KeyValuePair<Int32, Byte[]> LKeyPair in FData)
+    {
+      Pub.Write7BitEncodedInt(w, LKeyPair.Key);           // ObjectId
+      Pub.Write7BitEncodedInt(w, LKeyPair.Value.Length);  // ItemLength
+      w.Write(LKeyPair.Value);                            // Privileges
     }
   }
 
   public void Read(System.IO.BinaryReader r)
   {
-    Int32 Len;
+    Int32   LObjectId;
+    Byte[]  LPrivileges;
 
-    Len = Read7BitEncodedInt(r);
-    if(Len == 0)
-      Select = new SqlBytes();
-    else
-      Select = new SqlBytes(r.ReadBytes(Len));
+    System.IO.Stream  LStream = r.BaseStream;
+    Int32             LLength = (Int32)(LStream.Length);
+    Int16             LItemLength;
 
-    Len = Read7BitEncodedInt(r);
-    if(Len == 0)
-      Insert = new SqlBytes();
-    else
-      Insert = new SqlBytes(r.ReadBytes(Len));
+    FData = new Dictionary<Int32, Byte[]>();
+    while(LStream.Position < LLength)
+    {
+      LObjectId   = Pub.Read7BitEncodedInt(r);
+      LItemLength = (Int16)Pub.Read7BitEncodedInt(r);
+      LPrivileges = r.ReadBytes(LItemLength); 
 
-    Len = Read7BitEncodedInt(r);
-    if(Len == 0)
-      Update = new SqlBytes();
-    else
-      Update = new SqlBytes(r.ReadBytes(Len));
-
-    Len = Read7BitEncodedInt(r);
-    if(Len == 0)
-      Initialize = new SqlBytes();
-    else
-      Initialize = new SqlBytes(r.ReadBytes(Len));
-
-    Len = Read7BitEncodedInt(r);
-    if(Len == 0)
-      Delete = new SqlBytes();
-    else
-      Delete = new SqlBytes(r.ReadBytes(Len));
+      FData.Add(LObjectId, LPrivileges);
+    }
   }
 
-  [SqlMethod(Name = "Contains", OnNullCall = false, IsDeterministic = true)]
-  public Boolean Contains(Byte APrivilege, Int32 AValue)
+  [SqlMethod(Name = "Prepare", OnNullCall = false, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsMutator = true)]
+  public void Prepare(String AObject, String AKinds)
   {
-    SqlBytes LData;
-    switch(APrivilege)
+    SqlConnection LContextConnection = new SqlConnection("context connection=true");
+    LContextConnection.Open();
+
+    SqlCommand LCommand = LContextConnection.CreateCommand();
+    LCommand.CommandType = CommandType.Text;
+    //LCommand.CommandText = "SELECT [TPrivileges].[Prepare]('" + AObject.Replace("'", "''") + "', '" + AKinds.Replace("'", "''") + "')";
+    LCommand.CommandText = "SELECT [TPrivileges].[Prepare]('" + AObject.Replace("'", "''") + "')";
+
+    object LBytes = LCommand.ExecuteScalar();
+
+    if(LBytes is Byte[])
     {
-      case 1 : LData = Select; break;
-      case 2 : LData = Insert; break; 
-      case 4 : LData = Update; break; 
-      case 16: LData = Initialize; break; 
-      case 8 : LData = Delete; break; 
-      default:
-        return false;
+      System.IO.MemoryStream s = new System.IO.MemoryStream((Byte[])LBytes);
+      System.IO.BinaryReader r = new System.IO.BinaryReader(s);
+
+      System.IO.MemoryStream t = new System.IO.MemoryStream();
+      System.IO.BinaryWriter w = new System.IO.BinaryWriter(t);
+
+      Int16 LObjectId = (Int16)Pub.Read7BitEncodedInt(r);
+      FData.Remove(LObjectId);
+
+      // <TYPE>(1) <LENGTH>{1-5} <ROLES>
+      while(s.Position < s.Length)
+      {
+        Char    LType   = r.ReadChar();
+        Boolean LNeeded = (AKinds.IndexOf(LType) >= 0);
+        Int32   LLength = Pub.Read7BitEncodedInt(r);
+        if(LNeeded) 
+        {
+          w.Write(LType);
+          Pub.Write7BitEncodedInt(w, LLength);
+          w.Write(r.ReadBytes(LLength));
+        }
+        else
+          s.Seek(LLength, System.IO.SeekOrigin.Current);
+
+        //for(Int32 LCount = Pub.Read7BitEncodedInt(r); LCount > 0; LCount--)
+        //{
+        //  Int32 LValue = Pub.Read7BitEncodedInt(r);
+        //  if(LNeeded) 
+        //    Pub.Write7BitEncodedInt(w, LValue);
+        //}
+      }
+
+      //FData.Add(LObjectId, r.ReadBytes((Int32)(r.BaseStream.Length - 2)));
+      if(t.Length > 0)
+        FData.Add(LObjectId, t.ToArray());
+    }
+  }
+
+  public Boolean FindPrivileges(Byte[] APrivileges, Char APrivilege, System.IO.BinaryReader r, out Int32 ALength)
+  {
+    System.IO.Stream s = r.BaseStream;
+
+    ALength = 0;
+    while(s.Position < s.Length)
+    {
+      Char LPrivilege = r.ReadChar();
+      ALength = Pub.Read7BitEncodedInt(r);
+      if(LPrivilege == APrivilege)
+        return true;
+
+      s.Seek(ALength, System.IO.SeekOrigin.Current);
     }
 
-    if(LData.IsNull || LData.Length == 0)
+    return false;
+  }
+
+  [SqlMethod(Name = "Exists", OnNullCall = false, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  public Boolean Exists(Int16 AObjectId, Char APrivilege)
+  {
+    Byte[] LPrivileges;
+
+    if(!FData.TryGetValue(AObjectId, out LPrivileges))
       return false;
 
-    System.IO.BinaryReader r = new System.IO.BinaryReader(new System.IO.MemoryStream(LData.Buffer));
+    System.IO.MemoryStream s = new System.IO.MemoryStream(LPrivileges);
+    System.IO.BinaryReader r = new System.IO.BinaryReader(s);
+    Int32 LRolesLength;
 
-    int LCount = Read7BitEncodedInt(r);
-    for(; LCount > 0; LCount--)
-      if(Read7BitEncodedInt(r) == AValue) return true;
+    return FindPrivileges(LPrivileges, APrivilege, r, out LRolesLength);
+  }
+
+  [SqlMethod(Name = "Contains", OnNullCall = false, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  public Boolean Contains(Int16 AObjectId, Char APrivilege, Int32 AValue)
+  {
+    Byte[] LPrivileges;
+    if (!FData.TryGetValue(AObjectId, out LPrivileges))
+      return false;
+
+    System.IO.MemoryStream s = new System.IO.MemoryStream(LPrivileges);
+    System.IO.BinaryReader r = new System.IO.BinaryReader(s);
+    Int32 LEndPos;
+
+    if(!FindPrivileges(LPrivileges, APrivilege, r, out LEndPos))
+      return false;
+
+    LEndPos += (Int32)s.Position;
+    while(s.Position < LEndPos)
+      if(Pub.Read7BitEncodedInt(r) == AValue) return true;
 
     return false;
- }
+  }
 }
