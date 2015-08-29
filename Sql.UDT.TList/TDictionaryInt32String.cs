@@ -124,7 +124,12 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
 
     for(; LCount > 0; LCount--)
     {
+#if DEBUG
       Int32  LName  = r.ReadInt32();
+#else    
+      Int32  LName  = Sql.Read7BitEncodedInt(r);
+#endif
+
       String LValue = r.ReadString();
       if(LValue.Length == 1 && LValue[0] == '\0')
         LValue = null;
@@ -143,7 +148,11 @@ public class TDictionaryInt32String: IBinarySerialize/*, IXmlSerializable*/, INu
 
     foreach(KeyValuePair<Int32,String> LKeyPair in FList)
     {
+#if DEBUG
       w.Write(LKeyPair.Key);
+#else    
+      Sql.Write7BitEncodedInt(w, LKeyPair.Key);
+#endif
       w.Write(LKeyPair.Value == null ? '\0'.ToString() : LKeyPair.Value);
     }
 

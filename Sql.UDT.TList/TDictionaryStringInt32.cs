@@ -111,7 +111,15 @@ public class TDictionaryStringInt32: IBinarySerialize/*, IXmlSerializable*/, INu
 #endif
 
     for(; LCount > 0; LCount--)
-      FList.Add(r.ReadString(), r.ReadInt32());
+      FList.Add
+      (
+        r.ReadString(),
+#if DEBUG
+        r.ReadInt32()
+#else    
+        Sql.Read7BitEncodedInt(r)
+#endif
+      );
   }
 
   public void Write(System.IO.BinaryWriter w)
@@ -126,7 +134,11 @@ public class TDictionaryStringInt32: IBinarySerialize/*, IXmlSerializable*/, INu
     foreach(KeyValuePair<String,Int32> LKeyPair in FList)
     {
       w.Write(LKeyPair.Key);
+#if DEBUG
       w.Write(LKeyPair.Value);
+#else    
+      Sql.Write7BitEncodedInt(w, LKeyPair.Value);
+#endif
     }
 
   }

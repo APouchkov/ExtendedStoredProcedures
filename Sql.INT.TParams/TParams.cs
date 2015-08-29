@@ -1618,59 +1618,59 @@ namespace INT
     enum FormatTypes { TinyInt, SmallInt, Int, BigInt, Hex, Date, Time, DateTime, DateTimeOffset, String, VarChar, NVarChar, Float, Decimal, Numeric, Boolean, Bit };
     protected static String Format(TParams AParams, String AFormat)
     {
-      const char CParamChar = ':';
-      const char StickQuote = '|';
-      const char EqualQuote = '=';
+      const Char CParamChar  = ':';
+      const Char CStickQuote = '|';
+      const Char CEqualQuote = '=';
 
       if (String.IsNullOrEmpty(AFormat))
         return AFormat;
 
-      int StartIndex = 0;
-      StringBuilder result = new StringBuilder();
+      int LStartIndex = 0;
+      StringBuilder LResult = new StringBuilder(AFormat.Length);
 
       while (true)
       {
-        if (StartIndex >= AFormat.Length) break;
-        int Index = AFormat.IndexOf(CParamChar, StartIndex);  //Находим начало переменной для автозамены
+        if (LStartIndex >= AFormat.Length) break;
+        int LIndex = AFormat.IndexOf(CParamChar, LStartIndex);                  // Находим ":" - начало переменной для замены
 
-        char RightQuote;
-        if ((Index < 0)/*нету*/ || (Index >= AFormat.Length - 2)/*последний или предпослетний букав в строке*/)
+        Char LRightQuote;
+        if ((LIndex < 0) || (LIndex == AFormat.Length - 1))                     // последний букавок в строке
         {
-          result.Append(AFormat, StartIndex, AFormat.Length - StartIndex);  // не осталось переменных для автозамены выходим
+          LResult.Append(AFormat, LStartIndex, AFormat.Length - LStartIndex);   // не осталось переменных для автозамены выходим
           break;
         }
-        if (Index > StartIndex)
+        if (LIndex > LStartIndex)
         {
-          result.Append(AFormat, StartIndex, Index - StartIndex);  // не осталось переменных для автозамены выходим
-          StartIndex = Index;
+          LResult.Append(AFormat, LStartIndex, LIndex - LStartIndex);           // не осталось переменных для автозамены выходим
+          LStartIndex = LIndex;
         }
 
-        Index++;  //Двигаемся на 1 элемент вперед 
-        int RightQuoteIndex = -1;
+        LIndex++;  //Двигаемся на 1 элемент вперед 
+        int LRightQuoteIndex = -1;
 
         //Ожидаем квотик
-        switch (AFormat[Index])
+        switch (AFormat[LIndex])
         {
           case '{':
-            RightQuote = '}';
+            LRightQuote = '}';
             break;
           case '[':
-            RightQuote = ']';
+            LRightQuote = ']';
             break;
           case CParamChar: //попалось еще ":" - превратим их 2х в 1
-            result.Append(AFormat, StartIndex, Index - StartIndex);
-            StartIndex = Index + 1;
+            LResult.Append(AFormat, LStartIndex, LIndex - LStartIndex);
+            LStartIndex = LIndex + 1;
             continue;
 
           default: //Нету квотика значит это было ввообще не наше двоеточие
-            char LChar = AFormat[StartIndex];
+            char LChar = AFormat[LStartIndex];
 
 #region NotQoutedName
-            RightQuote = '0';
-            RightQuoteIndex = Index;
-            while (RightQuoteIndex < AFormat.Length)
+            LRightQuote = '0';
+            LRightQuoteIndex = LIndex;
+            while (LRightQuoteIndex < AFormat.Length)
             {
-              LChar = AFormat[RightQuoteIndex];
+              LChar = AFormat[LRightQuoteIndex];
               if (
                       (LChar >= 'A') && (LChar <= 'Z')
                       ||
@@ -1678,9 +1678,9 @@ namespace INT
                       ||
                       (LChar >= '0') && (LChar <= '9')
                       ||
-                      (LChar == '_')
+                      (LChar == '_') || (LChar == '#') || (LChar == '.') || (LChar == '{') || (LChar == '}')
                   )
-                RightQuoteIndex++;
+                LRightQuoteIndex++;
               else
                 break;
 
@@ -1690,31 +1690,31 @@ namespace INT
         }
 
         //Нашли левый квотик ищем где же правый
-        String LParamName = null;
-        String LDisplayType = null;
+        String LParamName     = null;
+        String LDisplayType   = null;
         String LDisplayFormat = null;
-        String LNullValue = null;
+        String LNullValue     = null;
 
-        if (RightQuoteIndex >= 0)
+        if (LRightQuoteIndex >= 0)
         {
-          LParamName = AFormat.Substring(Index, RightQuoteIndex - Index);
-          RightQuoteIndex--;
+          LParamName = AFormat.Substring(LIndex, LRightQuoteIndex - LIndex);
+          LRightQuoteIndex--;
         }
         else
         {
-          RightQuoteIndex = AFormat.IndexOf(RightQuote, Index + 1);
+          LRightQuoteIndex = AFormat.IndexOf(LRightQuote, LIndex + 1);
 
-          if (RightQuoteIndex < 0) //не нашли
+          if (LRightQuoteIndex < 0) //не нашли
           {
-            result.Append(AFormat, StartIndex, AFormat.Length - StartIndex);
+            LResult.Append(AFormat, LStartIndex, AFormat.Length - LStartIndex);
             break;
           }
-          result.Append(AFormat, StartIndex, Index - StartIndex - 1);
-          //Теперь у нас имя от Index до RightQuoteIndex парсим его
+          LResult.Append(AFormat, LStartIndex, LIndex - LStartIndex - 1);
+          //Теперь у нас имя от LIndex до LRightQuoteIndex парсим его
 
-          int EqualIndex = AFormat.IndexOf(EqualQuote, Index, RightQuoteIndex - Index); //находим знак равно
+          int EqualIndex = AFormat.IndexOf(CEqualQuote, LIndex, LRightQuoteIndex - LIndex); //находим знак равно
 
-          int TypeIndex = AFormat.IndexOf(StickQuote, Index, RightQuoteIndex - Index); //находим палку
+          int TypeIndex = AFormat.IndexOf(CStickQuote, LIndex, LRightQuoteIndex - LIndex); //находим палку
           int NullIndex = -1;
 
           if (EqualIndex > 0)
@@ -1726,37 +1726,37 @@ namespace INT
             }
             else
             {
-              NullIndex = AFormat.IndexOf(StickQuote, EqualIndex, RightQuoteIndex - EqualIndex);
+              NullIndex = AFormat.IndexOf(CStickQuote, EqualIndex, LRightQuoteIndex - EqualIndex);
             }
           }
 
-          if ((TypeIndex > Index + 1) && (TypeIndex < RightQuoteIndex))
+          if ((TypeIndex > LIndex + 1) && (TypeIndex < LRightQuoteIndex))
           {
-            LParamName = AFormat.Substring(Index + 1, TypeIndex - Index - 1);
+            LParamName = AFormat.Substring(LIndex + 1, TypeIndex - LIndex - 1);
             if (EqualIndex > 0)
               LDisplayType = AFormat.Substring(TypeIndex + 1, EqualIndex - TypeIndex - 1);
             else
-              LDisplayType = AFormat.Substring(TypeIndex + 1, RightQuoteIndex - TypeIndex - 1);
+              LDisplayType = AFormat.Substring(TypeIndex + 1, LRightQuoteIndex - TypeIndex - 1);
           }
 
           if (EqualIndex > 0)
           {
             if (LParamName == null)
-              LParamName = AFormat.Substring(Index + 1, EqualIndex - Index - 1);
+              LParamName = AFormat.Substring(LIndex + 1, EqualIndex - LIndex - 1);
 
             if (NullIndex > 0)
             {
               LDisplayFormat = AFormat.Substring(EqualIndex + 1, NullIndex - EqualIndex - 1);
-              LNullValue = AFormat.Substring(NullIndex + 1, RightQuoteIndex - NullIndex - 1);
+              LNullValue = AFormat.Substring(NullIndex + 1, LRightQuoteIndex - NullIndex - 1);
             }
             else
             {
-              LDisplayFormat = AFormat.Substring(EqualIndex + 1, RightQuoteIndex - EqualIndex - 1);
+              LDisplayFormat = AFormat.Substring(EqualIndex + 1, LRightQuoteIndex - EqualIndex - 1);
             }
           }
           if (LParamName == null)
           {
-            LParamName = AFormat.Substring(Index + 1, RightQuoteIndex - Index - 1);
+            LParamName = AFormat.Substring(LIndex + 1, LRightQuoteIndex - LIndex - 1);
           }
         }
 
@@ -1766,7 +1766,7 @@ namespace INT
           if (LNullValue == null)
             return null;
           else
-            result.Append(LNullValue);
+            LResult.Append(LNullValue);
         }
         else
         {
@@ -1781,10 +1781,10 @@ namespace INT
             if (LNullValue == null)
               return null;
             else
-              result.Append(LNullValue);
+              LResult.Append(LNullValue);
           }
           else if (String.IsNullOrEmpty(LDisplayFormat))
-            result.Append(LValue.ToString());
+            LResult.Append(LValue.ToString());
           else
           {
             switch (LFormat)
@@ -1793,7 +1793,7 @@ namespace INT
               case FormatTypes.Boolean:
                 try
                 {
-                  result.Append(Pub.FormatBoolean(LDisplayFormat, AsBit(LValue).IsTrue));
+                  LResult.Append(Pub.FormatBoolean(LDisplayFormat, AsBit(LValue).IsTrue));
                 }
                 catch (Exception E)
                 {
@@ -1808,7 +1808,7 @@ namespace INT
               case FormatTypes.Hex:
                 try
                 {
-                  result.Append(Pub.InternalFormatInteger(LDisplayFormat, AsBigInt(LValue).Value));
+                  LResult.Append(Pub.InternalFormatInteger(LDisplayFormat, AsBigInt(LValue).Value));
                 }
                 catch (Exception E)
                 {
@@ -1821,7 +1821,7 @@ namespace INT
               case FormatTypes.DateTime:
                 try
                 {
-                  result.Append(Pub.FormatDateTime2(LDisplayFormat, AsDateTime2(LValue)));
+                  LResult.Append(Pub.FormatDateTime2(LDisplayFormat, AsDateTime2(LValue)));
                 }
                 catch (Exception E)
                 {
@@ -1832,7 +1832,7 @@ namespace INT
               case FormatTypes.DateTimeOffset:
                 try
                 { 
-                  result.Append(Pub.FormatDateTimeOffset(LDisplayFormat, AsDateTimeOffset(LValue)));
+                  LResult.Append(Pub.FormatDateTimeOffset(LDisplayFormat, AsDateTimeOffset(LValue)));
                 }
                 catch (Exception E)
                 {
@@ -1843,7 +1843,7 @@ namespace INT
               case FormatTypes.VarChar:
               case FormatTypes.NVarChar:
               case FormatTypes.String:
-                result.Append(Pub.FormatString(Int16.Parse(LDisplayFormat), LValue.ToString()));
+                LResult.Append(Pub.FormatString(Int16.Parse(LDisplayFormat), LValue.ToString()));
                 break;
 
               case FormatTypes.Float:
@@ -1851,7 +1851,7 @@ namespace INT
               case FormatTypes.Numeric:
                 try
                 {
-                  result.Append(Pub.InternalFormatDecimal(LDisplayFormat, LValue.ToString(), "."));
+                  LResult.Append(Pub.InternalFormatDecimal(LDisplayFormat, LValue.ToString(), "."));
                 }
                 catch (Exception E)
                 {
@@ -1861,9 +1861,9 @@ namespace INT
             }
           }
         }
-        StartIndex = RightQuoteIndex + 1;
+        LStartIndex = LRightQuoteIndex + 1;
       }
-      return result.ToString();
+      return LResult.ToString();
     }
 
     #region Serialization

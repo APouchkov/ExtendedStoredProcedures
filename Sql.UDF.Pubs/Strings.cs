@@ -13,65 +13,76 @@ using System.Collections;
 /// </summary>
 [Serializable]
 [SqlUserDefinedAggregate(Format.UserDefined, IsInvariantToNulls = true, IsInvariantToDuplicates = false, IsInvariantToOrder = false, MaxByteSize = -1)]
-public class Concat : IBinarySerialize
+public class Concat: IBinarySerialize
 {
-  private StringBuilder intermediateResult;
-  private String separatorResult;
+  private StringBuilder FResult;
+  private String        FSeparator;
+  private Boolean       FEmpty;
 
   public void Init()
   {
-    intermediateResult = new StringBuilder();
-    separatorResult = "";
+    FResult     = new StringBuilder();
+    FSeparator  = "";
+    FEmpty      = true;
   }
 
-  public void Accumulate(SqlString value, SqlString separator)
+  public void Accumulate(String AValue, String ASeparator)
   {
-    if (value.IsNull || separator.IsNull) return;
-    if (intermediateResult.Length == 0)
-      intermediateResult.Append(value.Value);
-    else
-      intermediateResult.Append(value.ToString().Insert(0, separator.Value));
-    separatorResult = separator.Value;
+    if (AValue == null || ASeparator == null) return;
+
+    if(FEmpty)
+    {
+      FEmpty     = false;
+      FSeparator = ASeparator;
+    }
+    else if (ASeparator.Length > 0)
+      FResult.Append(ASeparator);
+
+    FResult.Append(AValue);
   }
 
-  public void Merge(Concat other)
+  public void Merge(Concat AOther)
   {
-    separatorResult = other.separatorResult;
-    if (intermediateResult.Length == 0 || separatorResult == String.Empty)
-      intermediateResult.Append(other.intermediateResult);
-    else
-      intermediateResult.Append(other.intermediateResult.Insert(0, separatorResult));
+    if(AOther.FEmpty) return;
+
+    FSeparator = AOther.FSeparator;
+    if (!FEmpty && FSeparator.Length > 0)
+      FResult.Append(FSeparator);
+
+    FResult.Append(AOther.FResult);
   }
 
-  public SqlString Terminate()
+  public String Terminate()
   {
-    if (intermediateResult != null && intermediateResult.Length > 0)
-      return (SqlString)(intermediateResult.ToString(0, intermediateResult.Length));
+    if (FResult != null && FResult.Length > 0)
+      return FResult.ToString();
     else
       return null;
   }
 
   public void Read(BinaryReader r)
   {
-    if (r == null) throw new ArgumentNullException("r");
-    intermediateResult = new StringBuilder(r.ReadString());
-    separatorResult = r.ReadString();
+    //if (r == null) throw new ArgumentNullException("r");
+    FResult     = new StringBuilder(r.ReadString());
+    FSeparator  = r.ReadString();
+    FEmpty      = r.ReadBoolean();
   }
 
   public void Write(BinaryWriter w)
   {
-    if (w == null) throw new ArgumentNullException("w");
-    w.Write(intermediateResult.ToString());
-    w.Write(separatorResult);
+    //if (w == null) throw new ArgumentNullException("w");
+    w.Write(FResult.ToString());
+    w.Write(FSeparator);
+    w.Write(FEmpty);
   }
 }
 
 public struct TSQLParamParseItem
 {
-  public String Gap;
-  public Char Quote;
-  public String Value;
-  public Boolean Eof;
+  public String   Gap;
+  public Char     Quote;
+  public String   Value;
+  public Boolean  Eof;
 }
 
 public class SQLParamsParser
@@ -344,7 +355,7 @@ public partial class Pub
   /// <summary>
   /// Возвращает символ закрывающей квоты, во символу открывающей квоты
   /// </summary>
-  public static char InternalGetRightQuote(char ALeftQuote)
+  public static char InternalGetRightQuote(Char ALeftQuote)
   {
     switch (ALeftQuote)
     {
@@ -356,7 +367,7 @@ public partial class Pub
     }
   }
 
-  public static char InternalGetRightQuote(char ALeftQuote, char[] AAllowedQuotes)
+  public static Char InternalGetRightQuote(Char ALeftQuote, Char[] AAllowedQuotes)
   {
     if (AAllowedQuotes.Contains(ALeftQuote))
       return InternalGetRightQuote(ALeftQuote);
@@ -402,14 +413,13 @@ public partial class Pub
   /// <summary>
   /// Разбивает строку на подстроки по делителю
   /// </summary>
-  [SqlFunction(FillRowMethodName = "SplitRow", DataAccess = DataAccessKind.None, TableDefinition = "value nvarchar(max)", IsDeterministic = true)]
-  public static IEnumerable Split(SqlString AText, Char ASeparator)
+  [SqlFunction(FillRowMethodName = "SplitRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Value] NVarChar(Max)", IsDeterministic = true)]
+  public static IEnumerable Split(String AText, Char ASeparator)
   {
-    if (AText.IsNull || (AText.Value.Length == 0)) return null; //yield break;
-    //if (String.IsNullOrEmpty(ASeparator))
-    //  return AText.Split();
+    // if (AText.IsNull || (AText.Value.Length == 0)) return null; //yield break;
+    if (String.IsNullOrEmpty(AText)) return null; //yield break;
 
-    return AText.Value.Split(new Char[1]{ASeparator});
+    return AText.Split(new Char[1]{ASeparator});
   }
 
   public static void SplitRow(Object ARow, out SqlString AValue)
@@ -417,52 +427,85 @@ public partial class Pub
     AValue = (String)ARow;
   }
 
-  [SqlFunction(Name = "Convert Binary::To Base64", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Convert Binary::To Base64", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String ConvertBinaryToBase64(SqlBinary ABinary)
   {
-    //if (ABinary.IsNull) return null;
     return Convert.ToBase64String(ABinary.Value);
   }
 
-  [SqlFunction(Name = "Trim Left", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static String TrimLeft(String AValue, SqlChars ASymbols)
+  [SqlFunction(Name = "Trim Left", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimLeft(String AValue, Char[] ASymbols)
   {
-    //if (AValue.IsNull) return AValue;
-    return AValue.TrimStart(ASymbols.Value);
+    return AValue.TrimStart(ASymbols);
   }
 
-  [SqlFunction(Name = "Trim Right", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static String TrimRight(String AValue, SqlChars ASymbols)
+  [SqlFunction(Name = "Trim Left(Null If Empty)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimLeftNull(String AValue, Char[] ASymbols)
   {
-    //if (AValue.IsNull) return AValue;
-    return AValue.TrimEnd(ASymbols.Value);
+    AValue = AValue.TrimStart(ASymbols);
+    if(AValue.Length == 0)
+      return null;
+    else
+      return AValue;
   }
 
-  [SqlFunction(Name = "Trim Right(Spaces)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Trim Right", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimRight(String AValue, Char[] ASymbols)
+  {
+    return AValue.TrimEnd(ASymbols);
+  }
+
+  [SqlFunction(Name = "Trim Right(Null If Empty)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimRightNull(String AValue, Char[] ASymbols)
+  {
+    AValue = AValue.TrimEnd(ASymbols);
+    if(AValue.Length == 0)
+      return null;
+    else
+      return AValue;
+  }
+
+  [SqlFunction(Name = "Trim Right(Spaces)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String TrimRightSpaces(String AValue)
   {
-    //if (AValue.IsNull) return AValue;
     return AValue.TrimEnd();
   }
 
-  [SqlFunction(Name = "Trim", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static String Trim(String AValue, SqlChars ASymbols)
+  [SqlFunction(Name = "Trim", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String Trim(String AValue, Char[] ASymbols)
   {
-    //if (AValue.IsNull) return AValue;
-    return AValue.Trim(ASymbols.Value);
+    return AValue.Trim(ASymbols);
   }
 
-  [SqlFunction(Name = "Trim(Spaces)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Trim(Null If Empty)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimNull(String AValue, Char[] ASymbols)
+  {
+    AValue = AValue.Trim(ASymbols);
+    if(AValue.Length == 0)
+      return null;
+    else
+      return AValue;
+  }
+
+  [SqlFunction(Name = "Trim(Spaces)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String TrimSpaces(String AValue)
   {
-    //if (AValue.IsNull) return AValue;
     return AValue.Trim();
   }
 
-  [SqlFunction(Name = "Remove Characters", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Remove Characters", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String RemoveCharacters(String AValue, Char[] AChars)
   {
-    //if (AValue.IsNull) return AValue;
     StringBuilder LResult = new StringBuilder(AValue.Length);
 
     for (int i = 0; i < AValue.Length; i++)
@@ -479,18 +522,18 @@ public partial class Pub
       return AValue;
   }
 
-  [SqlFunction(Name = "Quote", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Quote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String Quote(String AValue, Char AQuote)
   {
-    //if (AValue.IsNull) return AValue;
     Char RQuote = InternalGetRightQuote(AQuote);
     return AQuote + AValue.Replace(new String(RQuote, 1), new String(RQuote, 2)) + RQuote;
   }
 
-  [SqlFunction(Name = "Deep Quote", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Deep Quote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String DeepQuote(String AValue, Char AQuote, Byte ADepth)
   {
-    //if (AValue.IsNull) return AValue;
     Char RQuote = InternalGetRightQuote(AQuote);
     int Shl = 1 << (ADepth - 1);
     String RQuotes = new string(RQuote, Shl);
@@ -511,37 +554,40 @@ public partial class Pub
     }
   }
 
-  [SqlFunction(Name = "Quote String", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Quote String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String QuoteString(String AValue)
   {
-    //if (AValue.IsNull) return AValue;
     return Quote(AValue, '\'');
   }
 
-  [SqlFunction(Name = "Deep Quote String", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Deep Quote String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String DeepQuoteString(String AValue, Byte ADepth)
   {
-    //if (AValue.IsNull) return AValue;
     return DeepQuote(AValue, '\'', ADepth);
   }
 
-  [SqlFunction(Name = "UnQuote", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "UnQuote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String UnQuote(String AValue, Char[] AQuotes)
   {
     if (String.IsNullOrEmpty(AValue) || AQuotes == null || AQuotes.Length == 0) return AValue;
-    char LQuote = AValue[0];
+    Char LQuote = AValue[0];
 
     if (!AQuotes.Contains(LQuote))
       return AValue;
-    char RQuote = InternalGetRightQuote(LQuote);
+    Char RQuote = InternalGetRightQuote(LQuote);
     return AValue.Substring(1, AValue.Length - 2).Replace(new string(RQuote, 2), RQuote.ToString());
   }
 
-  [SqlFunction(Name = "Trim VarBinary", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Trim VarBinary", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static SqlBinary TrimVarBinary(SqlBinary AValue)
   {
     if ((AValue.Value.Length == 0) || (AValue.Value[0] > 0))
       return AValue;
+
     for (int I = 0; I < AValue.Value.Length; I++)
     {
       if (AValue.Value[I] > 0)

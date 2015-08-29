@@ -19,10 +19,10 @@
     <SchemaVersion>2.0</SchemaVersion>
     <OutputType>Database</OutputType>
     <NoStandardLibraries>false</NoStandardLibraries>
-    <AssemblyName>UDF.Pubs</AssemblyName>
+    <AssemblyName>UDF.Codes</AssemblyName>
     <FileUpgradeFlags>40</FileUpgradeFlags>
     <OldToolsVersion>4.0</OldToolsVersion>
-    <RootNamespace>UDF.Pubs</RootNamespace>
+    <RootNamespace>UDF.Codes</RootNamespace>
     <UpgradeBackupLocation>D:\Work\Projects\Extended Stored Procedures\Sql.UDF.Pubs\Backup1\</UpgradeBackupLocation>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
@@ -41,7 +41,7 @@
     <BootstrapperEnabled>true</BootstrapperEnabled>
     <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql110DatabaseSchemaProvider</DSP>
-    <Name>Sql.UDF.Pubs</Name>
+    <Name>Sql.UDF.Codes</Name>
     <ProjectVersion>4.0</ProjectVersion>
     <ProjectGuid>{c49a208c-9128-4915-afb9-57b27737a665}</ProjectGuid>
     <IncludeSchemaNameInFileName>False</IncludeSchemaNameInFileName>
@@ -66,6 +66,7 @@
     <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>
     <DefineDebug>true</DefineDebug>
     <DefineTrace>true</DefineTrace>
+    <SqlTargetName>UDF</SqlTargetName>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
     <DebugSymbols>false</DebugSymbols>
@@ -80,7 +81,6 @@
     <DefineDebug>false</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
-    <SqlTargetName>UDF</SqlTargetName>
   </PropertyGroup>
   <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
   <ItemGroup>
@@ -92,14 +92,8 @@
     <Reference Include="System.XML" />
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Arrays.cs" />
-    <Compile Include="Format.cs" />
-    <Compile Include="IIF.cs" />
-    <Compile Include="Strings.cs" />
-    <Compile Include="DateTimes.cs" />
+    <Compile Include="Codes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Sql.cs" />
-    <Compile Include="CommentMethodsParser.cs" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

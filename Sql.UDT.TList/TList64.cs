@@ -113,6 +113,27 @@ public class TListInt64: IBinarySerialize/*, IXmlSerializable*/, INullable
     return new SqlBytes(s);
   }
 
+  [
+    System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
+    SqlMethod(Name = "FromCompressedBinary", OnNullCall = false, DataAccess = DataAccessKind.None, IsDeterministic = true)
+  ]
+  public static TListInt64 FromCompressedBinary(SqlBytes AData)
+  {
+    if (AData.IsNull) return TListInt64.Null;
+
+    TListInt64 LResult = new TListInt64();
+    System.IO.BinaryReader r = new System.IO.BinaryReader(AData.Stream);
+
+    int LCount = Sql.Read7BitEncodedInt(r);
+
+    LResult.FList.Capacity = LCount;
+    for(; LCount > 0; LCount--)
+      LResult.FList.Add(Sql.Read7BitEncodedInt64(r));
+
+    return LResult;
+  }
+
+
   public void Read(System.IO.BinaryReader r)
   {
 #if DEBUG

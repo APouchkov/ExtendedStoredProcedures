@@ -14,25 +14,29 @@ public partial class Pub
   /// </summary>            string pattern = @"(?<argname>/[^\s=]+)=(?<argvalue>.+)";
   /// 
 
-  [SqlFunction(Name = "Format DateTime2", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format DateTime2", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatDateTime2(String AFormat, DateTime AValue)
   {
     return AValue.ToString(AFormat.Replace('m', 'M').Replace('n', 'm').Replace('h','H'), CultureInfo.InvariantCulture);
   }
 
-  [SqlFunction(Name = "Format DateTime", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format DateTime", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatDateTime(String AFormat, SqlDateTime AValue)
   {
     return FormatDateTime2(AFormat, AValue.Value);
   }
 
-  [SqlFunction(Name = "Format DateTimeOffset", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static String FormatDateTimeOffset(string AFormat, DateTimeOffset AValue)
+  [SqlFunction(Name = "Format DateTimeOffset", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String FormatDateTimeOffset(String AFormat, DateTimeOffset AValue)
   {
     return AValue.ToString(AFormat.Replace('m', 'M').Replace('n', 'm').Replace('h', 'H'), CultureInfo.InvariantCulture);
   }
 
-  [SqlFunction(Name = "Format String", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatString(Int16 AFormat, String AValue)
   {
     return AValue.PadRight(AFormat, ' ');
@@ -66,13 +70,15 @@ public partial class Pub
     }
   }
 
-  [SqlFunction(Name = "Format Integer", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format Integer", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatInteger(String AFormat, Int64 AValue)
   {
     return InternalFormatInteger(AFormat, AValue);
   }
 
-  [SqlFunction(Name = "Format Boolean", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format Boolean", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatBoolean(String AFormat, Boolean AValue)
   {
     const Char CDelimiter = '/';
@@ -89,6 +95,7 @@ public partial class Pub
   }
 
   [SqlFunction(Name = "Format Decimal", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
   public static String FormatDecimal(String AFormat, SqlDecimal AValue)
   {
     return InternalFormatDecimal(AFormat, AValue.ToString(), ".");

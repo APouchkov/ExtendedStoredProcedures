@@ -10,14 +10,14 @@ public partial class Pub
 {
     public struct CodesRow
     {
-      public int Index;
-      public string Operation;
-      public string Sign;
-      public string Code;
-      public string Params;
+      public int    Index;
+      public String Operation;
+      public String Sign;
+      public String Code;
+      public String Params;
     }
 
-    private static bool IsIdentChar(char ch)
+    private static bool IsIdentChar(Char ch)
     {
       return (Char.IsLetterOrDigit(ch) || ch == '[' || ch == ']' || ch == '_');
     }
@@ -27,7 +27,7 @@ public partial class Pub
     //  while (pos < str.Length && Char.IsWhiteSpace(str[pos])) pos++;
     //}
 
-    private static bool TryParseQuoted(string str, out string result, ref int pos)
+    private static bool TryParseQuoted(String str, out String result, ref int pos)
     {
       //SkipSpace(str, ref pos);
       if (str[pos] != '[') { result = null; return false; }
@@ -106,7 +106,7 @@ public partial class Pub
     /// <summary>
     /// Разбивает список кодов на элементы
     /// </summary>
-    [SqlFunction(FillRowMethodName = "CodesRows", DataAccess = DataAccessKind.None, TableDefinition = "[Code] nvarchar(max), [Index] smallint, [Operation] nchar(1), [Sign] nchar(1), [Params] nvarchar(max)", IsDeterministic = true)]
+    [SqlFunction(Name = "Codes", FillRowMethodName = "CodesRows", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Code] nvarchar(max), [Index] smallint, [Operation] nchar(1), [Sign] nchar(1), [Params] nvarchar(max)", IsDeterministic = true)]
     public static IEnumerable Codes(String AText, String AOperators, String ASigns, SqlBoolean AParams)
     {
       if (String.IsNullOrEmpty(AText)) return null;
@@ -118,10 +118,10 @@ public partial class Pub
       int     start = pos;
       bool    first = true;
 
-      string  operation = "+";
-      string  sign;
-      string  code;
-      string  param;
+      String  operation = "+";
+      String  sign;
+      String  code;
+      String  param;
 
       while (pos < AText.Length)
       {

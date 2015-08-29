@@ -82,6 +82,7 @@
     </Reference>
     <Reference Include="UDP.DynamicSQL">
       <HintPath>..\Sql.UDP.GetResults\obj\Release\UDP.DynamicSQL.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>

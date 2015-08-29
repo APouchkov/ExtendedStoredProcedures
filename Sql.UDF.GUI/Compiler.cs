@@ -333,7 +333,7 @@ public class ScriptParser
           }
         }
 
-        else if(FCommand == "SET")
+        else if(FCommand == "SET" || FCommand == "APPEND")
         {
           int LEqual = FValue.IndexOf('=');
           if(LEqual < 0)
@@ -343,7 +343,17 @@ public class ScriptParser
           if(LName.Length == 0)
             Exception("Имя макроса должно быть непустым: " + FCommand + ' ' + FValue);
           
-          FParams.AddParam(LName, new SqlString(FValue.Substring(LEqual + 1, FValue.Length - LEqual - 1)));
+          FValue = FValue.Substring(LEqual + 1, FValue.Length - LEqual - 1);
+          if(FCommand == "SET")
+            FParams.AddParam(LName, new SqlString(FValue));
+          else
+          {
+            SqlString FOldValue = FParams.AsSQLString(LName);
+            if(FOldValue.IsNull)
+              FParams.AddParam(LName, new SqlString(FValue));
+            else
+              FParams.AddParam(LName, new SqlString(FOldValue.Value + FValue));
+          }
           InternalSkipReturns();
         }
         else if(FCommand == "C" || FCommand == "COMMENT")
