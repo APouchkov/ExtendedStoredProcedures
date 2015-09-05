@@ -11,8 +11,6 @@
     </PostConversionAddToScc>
     <TargetDatabaseSet>True</TargetDatabaseSet>
     <TargetFrameworkProfile />
-    <AssemblyOwner>
-    </AssemblyOwner>
   </PropertyGroup>
   <PropertyGroup>
     <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
@@ -21,13 +19,11 @@
     <SchemaVersion>2.0</SchemaVersion>
     <OutputType>Database</OutputType>
     <NoStandardLibraries>false</NoStandardLibraries>
-    <AssemblyName>UDP.DynamicSQL</AssemblyName>
+    <AssemblyName>UDF.Pubs</AssemblyName>
     <FileUpgradeFlags>40</FileUpgradeFlags>
     <OldToolsVersion>4.0</OldToolsVersion>
-    <RootNamespace>SQL</RootNamespace>
-    <UpgradeBackupLocation>D:\Work\Projects\Extended Stored Procedures\Sql.UDP.GetResults\Backup\</UpgradeBackupLocation>
-    <IsWebBootstrapper>false</IsWebBootstrapper>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <RootNamespace>UDF.Pubs</RootNamespace>
+    <UpgradeBackupLocation>D:\Work\Projects\Extended Stored Procedures\Sql.UDF.Pubs\Backup1\</UpgradeBackupLocation>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -40,19 +36,21 @@
     <MapFileExtensions>true</MapFileExtensions>
     <ApplicationRevision>0</ApplicationRevision>
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
+    <IsWebBootstrapper>false</IsWebBootstrapper>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
+    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql110DatabaseSchemaProvider</DSP>
-    <Name>Sql.UDP.GetResults</Name>
-    <ProjectVersion>4.1</ProjectVersion>
-    <ProjectGuid>{70546fe5-a32d-4045-8e54-555f7b612825}</ProjectGuid>
+    <Name>Sql.UDF.Pubs</Name>
+    <ProjectVersion>4.0</ProjectVersion>
+    <ProjectGuid>{c49a208c-9128-4915-afb9-57b27737a665}</ProjectGuid>
     <IncludeSchemaNameInFileName>False</IncludeSchemaNameInFileName>
     <GenerateDatabaseFile>False</GenerateDatabaseFile>
     <GenerateCreateScript>False</GenerateCreateScript>
     <ModelCollation>1033,CI</ModelCollation>
     <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <DefaultSchema>SQL</DefaultSchema>
+    <DefaultSchema>dbo</DefaultSchema>
     <TargetLanguage>CS</TargetLanguage>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -82,9 +80,9 @@
     <DefineDebug>false</DefineDebug>
     <DefineTrace>true</DefineTrace>
     <GenerateSerializationAssemblies>Off</GenerateSerializationAssemblies>
+    <SqlTargetName>UDF</SqlTargetName>
   </PropertyGroup>
-  <Import Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" Condition="'$(SQLDBExtensionsRefPath)' != ''" />
-  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" Condition="'$(SQLDBExtensionsRefPath)' == ''" />
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Core">
@@ -92,22 +90,16 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
-    <Reference Include="UDT.TParams">
-      <HintPath>..\Sql.UDT.TParams\bin\Release\UDT.TParams.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="INT.TParams">
-      <HintPath>..\Sql.INT.TParams\bin\Release\INT.TParams.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
-    <Reference Include="UDF.Pubs">
-      <HintPath>..\Sql.UDF.Pubs\bin\Release\UDF.Pubs.dll</HintPath>
-      <Private>False</Private>
-    </Reference>
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Arrays.cs" />
+    <Compile Include="Format.cs" />
+    <Compile Include="IIF.cs" />
+    <Compile Include="Strings.cs" />
+    <Compile Include="DateTimes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Sql.UDP.GetResult.cs" />
+    <Compile Include="Sql.cs" />
+    <Compile Include="CommentMethodsParser.cs" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.
@@ -119,7 +111,7 @@
   <ItemGroup>
     <BootstrapperPackage Include="Microsoft.Net.Client.3.5">
       <Visible>False</Visible>
-      <ProductName>Клиентский профиль .NET Framework 3.5 SP1</ProductName>
+      <ProductName>.NET Framework Client Profile</ProductName>
       <Install>false</Install>
     </BootstrapperPackage>
     <BootstrapperPackage Include="Microsoft.Net.Framework.2.0">
@@ -144,7 +136,13 @@
     </BootstrapperPackage>
   </ItemGroup>
   <ItemGroup>
-    <Folder Include="Test Scripts\" />
     <Folder Include="Properties\" />
+    <Folder Include="Scripts\" />
   </ItemGroup>
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+    <PostBuildEvent>
+    </PostBuildEvent>
+  </PropertyGroup>
 </Project>

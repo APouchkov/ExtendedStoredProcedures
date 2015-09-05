@@ -28,8 +28,11 @@ public class TDictionaryInt16String: IBinarySerialize/*, IXmlSerializable*/, INu
       if(LResult.Length > 0)
         LResult.Append(';');
       LResult.Append(LKeyValuePair.Key);
-      LResult.Append('=');
-      LResult.Append(LKeyValuePair.Value);
+      if (LKeyValuePair.Value != null)
+      {
+        LResult.Append('=');
+        LResult.Append(LKeyValuePair.Value);
+      }
     }
 
     return LResult.ToString();

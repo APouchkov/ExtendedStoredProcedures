@@ -147,7 +147,8 @@ public class Sql
   private const String SQLDateTimePattern           = "yyyyMMdd HH:mm:ss.FFFFFFF";
   private const String SQLDateTimeOffsetPattern     = "yyyyMMdd HH:mm:ss.FFFFFFFzzz";
 
-  private const String XMLDateTimePattern           = "yyyy-MM-ddTHH:mm:ss.FFFFFFF";
+  public  const String XMLDatePattern               = "yyyy-MM-dd";
+  public  const String XMLDateTimePattern           = "yyyy-MM-ddTHH:mm:ss.FFFFFFF";
   private const String XMLDateTimeZeroOffsetPattern = "yyyy-MM-ddTHH:mm:ss.FFFFFFFZ";
   private const String XMLDateTimeOffsetPattern     = "yyyy-MM-ddTHH:mm:ss.FFFFFFFzzz";
 
@@ -311,7 +312,7 @@ public class Sql
                                           :
                                           ((DateTime)(SqlDateTime)value).ToString(TextDateTimePattern, CultureInfo.InvariantCulture);
       case SqlDbType.Date           : return (style == ValueDbStyle.XML) ?
-                                        XmlConvert.ToString((DateTime)value, XmlDateTimeSerializationMode.RoundtripKind)
+                                        XmlConvert.ToString((DateTime)value, XMLDatePattern)
                                         :
                                         (style == ValueDbStyle.SQL)?
                                           ((DateTime)value).ToString(SQLDatePattern, CultureInfo.InvariantCulture)
@@ -367,6 +368,14 @@ public class Sql
     }
     throw new Exception("Системная ошибка"); // Сюда никогда не должно попасть
   }
+
+  [SqlFunction(Name = "CastVariantAsString", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static String CastVariantAsString(Object AValue, String AStyle)
+  {
+    return ValueToString(AValue, (ValueDbStyle)Enum.Parse(typeof(ValueDbStyle), AStyle, true));
+  }
+
 
   /// <summary>
   /// Конвертирует значение параметра в текст
@@ -473,6 +482,26 @@ public class Sql
     {
       throw new Exception(String.Format("Не удалось сконвертировать значение '{0}' в тип {1}", value, type.ToString()));
     }
+  }
+
+  [SqlFunction(Name = "CastStringAsVariant", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static Object CastStringAsVariant(String AValue, String AType, String AStyle)
+  { 
+    return ValueFromString(AValue, (SqlDbType)Enum.Parse(typeof(SqlDbType), AType, true), (ValueDbStyle)Enum.Parse(typeof(ValueDbStyle), AStyle, true));
+  }
+
+  [SqlFunction(Name = "VariantReCast", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static Object VariantReCast(Object AValue, String AType)
+  { 
+    return
+      ValueFromString
+      (
+        ValueToString(AValue, ValueDbStyle.XML), 
+        (SqlDbType)Enum.Parse(typeof(SqlDbType), AType, true), 
+        ValueDbStyle.XML
+      );
   }
 
 #endregion Converting Params

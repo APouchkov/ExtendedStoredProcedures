@@ -117,6 +117,40 @@ namespace INT
     }
 
     /// <summary>
+    /// Преобразует перечисленные параметры в строку
+    /// </summary>
+    /// <returns>Возвращает список параметров строкой</returns>
+    public virtual String ToStringEx(String ANames)
+    {
+      if(String.IsNullOrEmpty(ANames)) return null;
+      StringBuilder w = new StringBuilder();
+
+      // Параметры
+      foreach (String LName in ANames.Split(new Char[]{';'}, StringSplitOptions.RemoveEmptyEntries))
+      {
+        Object LValue;
+        if (!FData.TryGetValue(LName, out LValue)) continue;
+        SqlDbType type = Sql.GetSqlType(LValue);
+        w.Append
+        (
+          (w.Length == 0 ? "" : ListSeparator)
+          +
+          String.Format
+          (
+            "{0}{1}={2}", 
+            EncodeName(LName),
+            type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LValue).TypeName : type.ToString())),
+            Sql.IsQuoteType(type) ?
+              Pub.Quote(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL), '"')
+              :
+              Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL))
+          );
+      }
+
+      return w.Length == 0 ? null : w.ToString();
+    }
+
+    /// <summary>
     /// Конверитрует список параметров из строки
     /// </summary>
     /// <param name="s">Список параметров, заданный строкой</param>

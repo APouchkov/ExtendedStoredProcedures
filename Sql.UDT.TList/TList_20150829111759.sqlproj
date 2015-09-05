@@ -27,7 +27,7 @@
     <OldToolsVersion>4.0</OldToolsVersion>
     <DSP>Microsoft.Data.Tools.Schema.Sql.Sql110DatabaseSchemaProvider</DSP>
     <Name>TList</Name>
-    <ProjectVersion>4.1</ProjectVersion>
+    <ProjectVersion>4.0</ProjectVersion>
     <ProjectGuid>{708a8542-6251-468f-9357-5d781a8d6130}</ProjectGuid>
     <IncludeSchemaNameInFileName>False</IncludeSchemaNameInFileName>
     <GenerateDatabaseFile>False</GenerateDatabaseFile>
@@ -67,8 +67,7 @@
   <PropertyGroup>
     <RootNamespace>TList</RootNamespace>
   </PropertyGroup>
-  <Import Project="$(SQLDBExtensionsRefPath)\Microsoft.Data.Tools.Schema.SqlTasks.targets" Condition="'$(SQLDBExtensionsRefPath)' != ''" />
-  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" Condition="'$(SQLDBExtensionsRefPath)' == ''" />
+  <Import Project="$(MSBuildExtensionsPath)\Microsoft\VisualStudio\v$(VisualStudioVersion)\SSDT\Microsoft.Data.Tools.Schema.SqlTasks.targets" />
   <ItemGroup>
     <Reference Include="System" />
     <Reference Include="System.Data" />
@@ -92,8 +91,6 @@
     <Compile Include="TDictionaryInt32String.cs" />
     <Compile Include="TDictionaryInt16String.cs" />
     <Compile Include="TDictionaryStringInt16.cs" />
-    <Compile Include="TListDateTime.cs" />
-    <Compile Include="TDictionaryDateString.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Test Scripts\" />

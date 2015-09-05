@@ -302,17 +302,13 @@ public class ScriptParser
         }
         else if(FCommand == "IMPORT")
         {
-          byte LDepth;
-          String LStringFValue = FValue;
-          InternalDeepQuoteLevel(ref LStringFValue, out LDepth);
-
           if(FSqlCommandOther == null)
           {
             FSqlCommandOther = FSqlConnection.CreateCommand();
             FSqlCommandOther.CommandType = CommandType.Text;
           }
 
-          FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(LStringFValue, FParams);
+          FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FValue, FParams);
           try
           { 
             using (SqlDataReader LSqlReader = FSqlCommandOther.ExecuteReader())
@@ -326,6 +322,32 @@ public class ScriptParser
                   FParams.AddParam(LSqlReader.GetName(i), LValues[i]);
               }
             }
+          }
+          catch(Exception E)
+          {
+            Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
+          }
+        }
+
+        else if(FCommand == "DEFINE")
+        {
+          if(FSqlCommandOther == null)
+          {
+            FSqlCommandOther = FSqlConnection.CreateCommand();
+            FSqlCommandOther.CommandType = CommandType.Text;
+          }
+
+          FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FValue, FParams);
+          try
+          {
+            Object LValues = FSqlCommandOther.ExecuteScalar();
+            if(LValues != null && LValues != DBNull.Value)
+            {
+              String SValues = Convert.ToString(LValues);
+              foreach(String SValue in SValues.Split(new Char[] {','}, StringSplitOptions.RemoveEmptyEntries))
+                FParams.AddParam(SValue, (SqlBoolean)true);
+            }
+
           }
           catch(Exception E)
           {

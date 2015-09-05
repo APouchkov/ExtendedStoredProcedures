@@ -470,7 +470,7 @@ public partial class Pub
       return AValue;
   }
 
-  [SqlFunction(Name = "Trim Right(Spaces)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Trim Right#Spaces", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String TrimRightSpaces(String AValue)
   {
@@ -495,11 +495,22 @@ public partial class Pub
       return AValue;
   }
 
-  [SqlFunction(Name = "Trim(Spaces)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Trim#Spaces", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String TrimSpaces(String AValue)
   {
     return AValue.Trim();
+  }
+
+  [SqlFunction(Name = "Trim#Spaces(Null If Empty)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String TrimSpacesNull(String AValue)
+  {
+    AValue = AValue.Trim();
+    if(AValue.Length == 0)
+      return null;
+    else
+      return AValue;
   }
 
   [SqlFunction(Name = "Remove Characters", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]

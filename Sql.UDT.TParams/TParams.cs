@@ -51,22 +51,6 @@ namespace UDT
       }
     }
 
-    /// <summary>
-    /// Список имён, типов и значений параметров коллекции в табличном виде
-    /// </summary>
-/*
-    [SqlFunction(FillRowMethodName = "ListNamesRow", DataAccess = DataAccessKind.Read, TableDefinition = "[Name] NVarChar(127), [Type] NVarChar(127)", IsDeterministic = true)]
-    public static IEnumerable ListNames(TParams Params)
-    {
-      return Params.ListParams(false);
-    }
-    public static void ListNamesRow(object Row, out SqlString Name, out SqlString Type)
-    {
-      Name = ((TParamRow)Row).Name;
-      Type = ((TParamRow)Row).Type.ToString();
-    }
-*/
-
     [SqlFunction(Name = "Enum", FillRowMethodName = "EnumRow", DataAccess = DataAccessKind.Read, TableDefinition = "[Name] NVarChar(127), [Type] NVarChar(127), [Value] SQL_Variant", IsDeterministic = true)]
     public static IEnumerable Enum(TParams Params)
     {
@@ -98,6 +82,15 @@ namespace UDT
     public override String ToString()
     {
       return base.ToString();
+    }
+
+    /// <summary>
+    /// Преобразует перечисленные параметры в строку
+    /// </summary>
+    [SqlMethod(Name = "ToStringEx", OnNullCall = false, IsDeterministic = true)]
+    public override String ToStringEx(String ANames)
+    {
+      return base.ToStringEx(ANames);
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Target")]

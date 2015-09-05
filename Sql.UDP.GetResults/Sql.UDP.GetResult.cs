@@ -28,6 +28,7 @@ public static class DynamicSQL
   }
 
   //[SqlFunction(Name = "Final SQL(Custom)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  // EXEC [A].[B] :Param1, :[Param2], :[$Params;Param2]
   public static String FinalSQLEx(String ASQL, UDT.TParams AParams, Boolean AOnlyQuoted)
   {
     if(String.IsNullOrEmpty(ASQL)) return ASQL;
@@ -54,7 +55,14 @@ public static class DynamicSQL
           Result.Append(':');
           Result.Append(Parser.Current.Value);
         }
-        else if (AParams != null && AParams.TryGetValue(Parser.Current.Value, out LParamValue))
+        else if (AParams == null)
+          Result.Append("NULL");
+        else if(Parser.Current.Value[0] == '$')
+        {
+          String LValues = (Parser.Current.Value.Length == 1 ? AParams.ToString() : AParams.ToStringEx(Parser.Current.Value.Substring(1)));
+          Result.Append(LValues == null ? "NULL" : Pub.QuoteString(LValues));
+        }
+        else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))
         {
           Result.Append(Sql.ValueToText(LParamValue, Sql.ValueDbStyle.SQL, '\''));
         }
