@@ -24,7 +24,7 @@ public partial class Compiler
 
     if(ATranslateScalar != null && ATranslateScalar.IndexOf("@Text") == -1)
       throw new Exception("Скалярный запрос на межязыковой перевод должен содержать параметр \"@Text\"");
-    AResult = new SqlChars((new ScriptParser(AText, AParams, Pub.CommentMethodsParser(AComments), ALiteral, ATranslateScalar)).Text.ToString());
+    AResult = new SqlChars((new ScriptParser(AText, AParams, Pub.CommentMethodsParser(AComments), ALiteral, ATranslateScalar)).FText.ToString());
   }
 }
 
@@ -68,7 +68,7 @@ public class ScriptParser
   private SqlCommand    FSqlCommandTranslateScalar;
   private SqlCommand    FSqlCommandOther;
 
-  public StringBuilder Text;
+  public StringBuilder FText;
 
   public void Exception(String AInstruction)
   {
@@ -97,7 +97,7 @@ public class ScriptParser
     FValue   = "";
     //FBol     = false;
 
-    Text = new StringBuilder(1024);
+    FText = new StringBuilder(1024);
 
     if(FParams != null)
     {
@@ -157,15 +157,36 @@ public class ScriptParser
       return (FParams.Exists(FValue) == (FCommand == "IFDEF"));
   }
 
+  private void InitSqlCommandOther()
+  {
+    if(FSqlCommandOther == null)
+    {
+      FSqlCommandOther = FSqlConnection.CreateCommand();
+      FSqlCommandOther.CommandType = CommandType.Text;
+    }
+  }
+
+  private DataTable GetDataTable(SqlCommand ASqlCommand)
+  {
+    SqlDataAdapter LDataAdapter = new SqlDataAdapter(ASqlCommand);
+    DataTable LDataTable = new DataTable();
+    LDataAdapter.ReturnProviderSpecificTypes = true;
+    LDataAdapter.Fill(LDataTable);
+
+    return LDataTable;
+  }
+
   // Возвращает TRUE, если найден ELSE
-  private void CallIF(TScriptParserWaitFor AWaitFor = TScriptParserWaitFor.None, Boolean ASkipText = false, Boolean AParentSkipText = false)
+  private void CallIF(TScriptParserWaitFor AWaitFor = TScriptParserWaitFor.None, Boolean ASkipText = false, Boolean AParentSkipText = false, StringBuilder AText = null)
   {
     Boolean LSkipText = ASkipText;
     Boolean LElseIfCompleted = (AWaitFor != TScriptParserWaitFor.None && !ASkipText && !AParentSkipText);
+    if(AText == null)
+      AText = FText;
 
     while (MoveNext())
     {
-      if(!LSkipText) Text.Append(FGap);
+      if(!LSkipText) AText.Append(FGap);
 
       if(!String.IsNullOrEmpty(FCommand))
       { 
@@ -180,6 +201,33 @@ public class ScriptParser
 
           // SqlContext.Pipe.Send("IF: LElseFound = " + LElseFound.ToString());
         }
+        else if(FCommand == "FOREACH")
+        {
+          int LPosition = FPosition;
+          Char LCurrChar = FCurrChar;
+
+          InitSqlCommandOther();
+          FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FValue, FParams);
+
+          DataTable LDataTable = null;
+
+          try { LDataTable = GetDataTable(FSqlCommandOther); }
+          catch (Exception E) { Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
+
+          foreach(DataRow LDataRow in LDataTable.Rows)
+          {
+            FPosition = LPosition;
+            FCurrChar = LCurrChar;
+            foreach(DataColumn LColumn in LDataTable.Columns)
+              FParams.AddParam(LColumn.ColumnName, LDataRow[LColumn]);
+            CallIF(TScriptParserWaitFor.End);
+          }
+          foreach(DataColumn LColumn in LDataTable.Columns)
+            FParams.DeleteParam(LColumn.ColumnName);
+
+          LDataTable.Clear();
+        }
+
         else if(FCommand == "END" || FCommand == "ENDIF" || FCommand == "IFEND")
         {
           if(FBol) InternalSkipReturns();
@@ -253,9 +301,7 @@ public class ScriptParser
 
           SqlString LValue = INT.TParams.AsNVarChar(FParams, LStringFValue);
           if(!LValue.IsNull)
-          {
-            Text.Append(InternalDeepQuote(LValue.Value, LDepth));
-          }
+            AText.Append(InternalDeepQuote(LValue.Value, LDepth));
         }
         else if(FTranslateScalar != null && (FCommand == "T" || FCommand == "TRANSLATE"))
         {
@@ -273,7 +319,7 @@ public class ScriptParser
 
           FSqlCommandTranslateScalar.Parameters[0].Value = LStringFValue;
           Object LValue = FSqlCommandTranslateScalar.ExecuteScalar();
-          Text.Append(InternalDeepQuote(LValue.ToString(), LDepth));
+          AText.Append(InternalDeepQuote(LValue.ToString(), LDepth));
         }
         else if(FCommand == "SELECT" || FCommand == "EXEC")
         {
@@ -281,19 +327,14 @@ public class ScriptParser
           String LStringFValue = FValue;
           InternalDeepQuoteLevel(ref LStringFValue, out LDepth);
 
-          if(FSqlCommandOther == null)
-          {
-            FSqlCommandOther = FSqlConnection.CreateCommand();
-            FSqlCommandOther.CommandType = CommandType.Text;
-          }
-
-          //Object LValue = INT.TParams.InternalEvaluate(FParams, FCommand + ' ' + LStringFValue);
+          InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FCommand + ' ' + LStringFValue, FParams);
+
           try
           { 
             Object LValue = FSqlCommandOther.ExecuteScalar();
             if(LValue != null && LValue != DBNull.Value)
-              Text.Append(InternalDeepQuote(Convert.ToString(LValue), LDepth));
+              AText.Append(InternalDeepQuote(Convert.ToString(LValue), LDepth));
           }
           catch(Exception E)
           {
@@ -302,80 +343,91 @@ public class ScriptParser
         }
         else if(FCommand == "IMPORT")
         {
-          if(FSqlCommandOther == null)
-          {
-            FSqlCommandOther = FSqlConnection.CreateCommand();
-            FSqlCommandOther.CommandType = CommandType.Text;
-          }
-
+          InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FValue, FParams);
-          try
-          { 
-            using (SqlDataReader LSqlReader = FSqlCommandOther.ExecuteReader())
-            {
-              if (!LSqlReader.IsClosed && LSqlReader.Read())
-              { 
-                Object[] LValues = new object[LSqlReader.FieldCount];
 
-                LSqlReader.GetSqlValues(LValues);
-                for (int i = LSqlReader.FieldCount - 1; i >= 0; i--)
-                  FParams.AddParam(LSqlReader.GetName(i), LValues[i]);
-              }
-            }
-          }
-          catch(Exception E)
+          SqlDataReader LReader = null;
+
+          try { LReader = FSqlCommandOther.ExecuteReader(); }
+          catch(Exception E) { Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
+
+          if (!LReader.IsClosed)
           {
-            Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
+            if (LReader.Read())
+            {
+              Object[] LValues = new object[LReader.FieldCount];
+
+              LReader.GetSqlValues(LValues);
+              for (int i = LReader.FieldCount - 1; i >= 0; i--)
+                FParams.AddParam(LReader.GetName(i), LValues[i]);
+            }
+            LReader.Close();
           }
         }
 
         else if(FCommand == "DEFINE")
         {
-          if(FSqlCommandOther == null)
-          {
-            FSqlCommandOther = FSqlConnection.CreateCommand();
-            FSqlCommandOther.CommandType = CommandType.Text;
-          }
-
+          InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(FValue, FParams);
-          try
+
+          SqlDataReader LReader = null;
+
+          try { LReader = FSqlCommandOther.ExecuteReader(); }
+          catch(Exception E) { Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
+
+          if (!LReader.IsClosed)
           {
-            Object LValues = FSqlCommandOther.ExecuteScalar();
-            if(LValues != null && LValues != DBNull.Value)
+            while (LReader.Read() && !LReader.IsDBNull(0))
             {
-              String SValues = Convert.ToString(LValues);
-              foreach(String SValue in SValues.Split(new Char[] {','}, StringSplitOptions.RemoveEmptyEntries))
+              String SValues = LReader.GetString(0);
+              foreach (String SValue in SValues.Split(new Char[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
                 FParams.AddParam(SValue, (SqlBoolean)true);
             }
-
-          }
-          catch(Exception E)
-          {
-            Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
+            LReader.Close();
           }
         }
 
         else if(FCommand == "SET" || FCommand == "APPEND")
         {
           int LEqual = FValue.IndexOf('=');
-          if(LEqual < 0)
-            Exception("Пропущен символ присвоения '=': " + FCommand + ' ' + FValue);
+          if (LEqual < 0)
+          {
+            //Exception("Пропущен символ присвоения '=': " + FCommand + ' ' + FValue);
+            Boolean LSet  = (FCommand == "SET");
+            String  LName = FValue;
 
-          String LName = FValue.Substring(0, LEqual).Trim();
-          if(LName.Length == 0)
-            Exception("Имя макроса должно быть непустым: " + FCommand + ' ' + FValue);
-          
-          FValue = FValue.Substring(LEqual + 1, FValue.Length - LEqual - 1);
-          if(FCommand == "SET")
-            FParams.AddParam(LName, new SqlString(FValue));
+            StringBuilder LText = new StringBuilder();
+            CallIF(AWaitFor: TScriptParserWaitFor.End, AText: LText);
+            if (LSet)
+              FParams.AddParam(LName, new SqlString(LText.ToString()));
+            else
+            {
+              SqlString FOldValue = FParams.AsSQLString(LName);
+              if (FOldValue.IsNull)
+                FParams.AddParam(LName, new SqlString(LText.ToString()));
+              else
+                FParams.AddParam(LName, new SqlString(FOldValue.Value + LText.ToString()));
+            }
+          }
           else
           {
-            SqlString FOldValue = FParams.AsSQLString(LName);
-            if(FOldValue.IsNull)
+            String LName = FValue.Substring(0, LEqual).Trim();
+            if (LName.Length == 0)
+              Exception("Имя макроса должно быть непустым: " + FCommand + ' ' + FValue);
+
+            FValue = FValue.Substring(LEqual + 1, FValue.Length - LEqual - 1);
+            if (FCommand == "SET")
               FParams.AddParam(LName, new SqlString(FValue));
             else
-              FParams.AddParam(LName, new SqlString(FOldValue.Value + FValue));
+            {
+              SqlString FOldValue = FParams.AsSQLString(LName);
+              if (FOldValue.IsNull)
+                FParams.AddParam(LName, new SqlString(FValue));
+              else
+                FParams.AddParam(LName, new SqlString(FOldValue.Value + FValue));
+            }
           }
+          
           InternalSkipReturns();
         }
         else if(FCommand == "C" || FCommand == "COMMENT")
@@ -436,7 +488,6 @@ public class ScriptParser
 
   public Boolean MoveNext()
   {
-
     int LPosition;
     int LLine = FLine;
     Boolean LWaitForCommand = false;

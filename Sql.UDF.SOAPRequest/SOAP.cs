@@ -36,6 +36,7 @@ namespace Sql.UDF.SOAPRequest
             soapRequest += "</soap:Body></soap:Envelope>";
 
             var req = WebRequest.Create(uri.ToString());
+            
             req.Headers.Add("SOAPAction", "\"\"");
             req.ContentType = "text/xml;charset=\"utf-8\"";
             req.Method = "POST";
