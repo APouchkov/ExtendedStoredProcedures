@@ -7,7 +7,7 @@ using System.Text;
 using System.Collections;
 using System.Globalization;
 
-public partial class Pub
+public class Formats
 {
   /// <summary>
   /// Форматирует параметры
@@ -94,7 +94,7 @@ public partial class Pub
     return InternalFormatDecimal(AFormat, AValue.ToString(), ".");
   }
 
-  [SqlFunction(Name = "Format Decimal", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "Format Decimal", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String FormatDecimal(String AFormat, SqlDecimal AValue)
   {

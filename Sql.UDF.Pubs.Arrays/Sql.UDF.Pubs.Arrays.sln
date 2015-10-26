@@ -1,0 +1,24 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.23107.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "Sql.UDF.Pubs.Arrays", "Sql.UDF.Pubs.Arrays.sqlproj", "{C49A208C-9128-4915-AFB9-57B27737A665}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Release|Any CPU.Build.0 = Release|Any CPU
+		{C49A208C-9128-4915-AFB9-57B27737A665}.Release|Any CPU.Deploy.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+EndGlobal

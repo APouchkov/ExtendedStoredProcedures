@@ -91,16 +91,14 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.XML" />
+    <Reference Include="UDF.Pubs.Strings">
+      <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
-    <Compile Include="Arrays.cs" />
-    <Compile Include="Format.cs" />
-    <Compile Include="IIF.cs" />
-    <Compile Include="Strings.cs" />
-    <Compile Include="DateTimes.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="Sql.cs" />
-    <Compile Include="CommentMethodsParser.cs" />
+    <Compile Include="Common.cs" />
   </ItemGroup>
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
        Other similar extension points exist, see Microsoft.Common.targets.

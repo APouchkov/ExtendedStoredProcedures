@@ -8,17 +8,8 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Text;
 
-public partial class Pub
+public class Arrays
 {
-  static String NullIfEmpty(String Value)
-  {
-    return Value == "" ? null : Value;
-  }
-  static String NullIfEmpty(SqlString Value)
-  {
-    return Value.IsNull ? null : NullIfEmpty(Value.Value);
-  }
-
   /// Разбивает массив на элементы по делителю
   [SqlFunction(Name = "Repeat", FillRowMethodName = "RepeatRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Index] int", IsDeterministic = true)]
   public static IEnumerable Repeat(Int32 AFrom, Int32 ATo)
@@ -71,7 +62,6 @@ public partial class Pub
     }
   }
 
-  // ---------------------------------------------------------------------------
   struct CharRow
   {
     public Char   Char;
@@ -105,6 +95,22 @@ public partial class Pub
     public String Value;
   }
 
+  /// <summary>
+  /// Разбивает строку на подстроки по делителю
+  /// </summary>
+  [SqlFunction(FillRowMethodName = "SplitRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Value] NVarChar(Max)", IsDeterministic = true)]
+  public static IEnumerable Split(String AText, Char ASeparator)
+  {
+    if (String.IsNullOrEmpty(AText)) return null;
+
+    return AText.Split(new Char[1]{ASeparator});
+  }
+
+  public static void SplitRow(Object ARow, out String AValue)
+  {
+    AValue = (String)ARow;
+  }
+
   /// Разбивает массив на элементы по делителю
   [SqlFunction(FillRowMethodName = "ArrayToRowSetRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Value] nvarchar(max), [Index] int", IsDeterministic = true)]
   public static IEnumerable ArrayToRowSet(String AText, Char ASeparator)
@@ -117,9 +123,7 @@ public partial class Pub
     foreach (String LLine in AText.Split(new char[]{ASeparator})) // StringSplitOptions.RemoveEmptyEntries
     {
       if (LLine.Length == 0)
-      {
         LRow.Value = null;
-      }
       else
         LRow.Value = LLine;
       String LULine = LRow.Value.ToUpper();
@@ -383,10 +387,6 @@ public partial class Pub
   [SqlFunction(Name = "InArray", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static Boolean InArray(String AArray, String AElement, Char ASeparator)
   {
-    //String
-    //  LArray       = NullIfEmpty(AArray),
-    //  LElement     = NullIfEmpty(AElement);
-
 		if (String.IsNullOrEmpty(AArray) || String.IsNullOrEmpty(AElement) || AArray.Equals(ASeparator))
 			return false;
 
@@ -401,10 +401,6 @@ public partial class Pub
 	[SqlFunction(Name = "Arrays Merge", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String ArraysMerge(String AArray1, String AArray2, Char ASeparator)
   {
-    //String
-    //  LArray1       = NullIfEmpty(AArray1),
-    //  LArray2       = NullIfEmpty(AArray2);
-
 		if (String.IsNullOrEmpty(AArray2) || AArray2.Equals(ASeparator))
 			return AArray1;
 
@@ -437,10 +433,6 @@ public partial class Pub
 	[SqlFunction(Name = "CharSetMerge", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String CharSetMerge(String AArray1, String AArray2)
   {
-    //String
-    //  LArray1       = NullIfEmpty(AArray1),
-    //  LArray2       = NullIfEmpty(AArray2);
-
 		if (String.IsNullOrEmpty(AArray2))
 			return AArray1;
 
@@ -455,10 +447,6 @@ public partial class Pub
   // RETURNS NULL ON NULL INPUT
   public static String ArraysJoin(String AArray1, String AArray2, Char ASeparator)
   {
-    //String
-    //  LArray1      = (AArray1.IsNull ? null : NullIfEmpty(AArray1.Value)),
-    //  LArray2      = (AArray2.IsNull ? null : NullIfEmpty(AArray2.Value));
-
     if (String.IsNullOrEmpty(AArray1) || String.IsNullOrEmpty(AArray2)
         ||
         AArray1.Equals(ASeparator) || AArray2.Equals(ASeparator)
@@ -762,7 +750,7 @@ public class MergeAgg : IBinarySerialize
 				OAny		= true;
 			}
 			else
-				Pub.InternalMerge(ref OResult, AValue, OSeparator);
+				Arrays.InternalMerge(ref OResult, AValue, OSeparator);
   }
 
   public void Merge(MergeAgg AOther)
@@ -784,7 +772,7 @@ public class MergeAgg : IBinarySerialize
 				OAny		= true;
 			}
 			else
-				Pub.InternalMerge(ref OResult, AOther.OResult, OSeparator);
+				Arrays.InternalMerge(ref OResult, AOther.OResult, OSeparator);
   }
 
   public SqlString Terminate()
@@ -847,12 +835,12 @@ public class CharSetMergeAgg: IBinarySerialize
     if (AValue == null) 
       return;
 
-    Pub.InternalCharSetMerge(ref OResult, AValue);
+    Arrays.InternalCharSetMerge(ref OResult, AValue);
   }
 
   public void Merge(CharSetMergeAgg AOther)
   {
-    Pub.InternalCharSetMerge(ref OResult, AOther.OResult);
+    Arrays.InternalCharSetMerge(ref OResult, AOther.OResult);
   }
 
   public SqlString Terminate()

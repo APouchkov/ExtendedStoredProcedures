@@ -46,12 +46,11 @@ namespace UDT
     {
       get
       {
-        TParams result = new TParams();
-        return result;
+        return null; //new TParams();
       }
     }
 
-    [SqlFunction(Name = "Enum", FillRowMethodName = "EnumRow", DataAccess = DataAccessKind.Read, TableDefinition = "[Name] NVarChar(127), [Type] NVarChar(127), [Value] SQL_Variant", IsDeterministic = true)]
+    [SqlFunction(Name = "Enum", FillRowMethodName = "EnumRow", DataAccess = DataAccessKind.Read, TableDefinition = "[Name] NVarChar(128), [Type] NVarChar(127), [Value] SQL_Variant", IsDeterministic = true)]
     public static IEnumerable Enum(TParams Params)
     {
       return Params.ListParams();
@@ -93,6 +92,15 @@ namespace UDT
       return base.ToStringEx(ANames);
     }
 
+    /// <summary>
+    /// Преобразует данные в строку XML
+    /// </summary>
+    [SqlMethod(Name = "ToXMLString", OnNullCall = true, IsDeterministic = true)]
+    public new String ToXMLString(String AElement = null)
+    {
+      return base.ToXMLString(AElement);
+    }
+
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Target")]
     public new void Write(System.IO.BinaryWriter Target)
     {
@@ -128,9 +136,9 @@ namespace UDT
     public static TParams Parse(SqlString Src)
     {
       if (Src.IsNull) return null;
-      TParams result = new TParams();
-      result.FromString(Src.Value);
-      return result;
+      TParams LResult = TParams.New();
+      LResult.FromString(Src.Value);
+      return LResult;
     }
 
     /// <summary>
@@ -304,7 +312,26 @@ namespace UDT
     /// <summary>
     /// Вычисляет произвольное математическое выражение, используя обратный вызов срезы SQL
     /// </summary>
-    [SqlMethod(Name = "Evaluate", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read)]
+    [SqlMethod(Name = "Evaluate", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+    public static object Evaluate(TParams AParams, String AExpression)
+    {
+      return Evaluate(AParams, AExpression, null);
+    }
+
+    /// <summary>
+    /// Вычисляет произвольное логическое выражение, используя обратный вызов срезы SQL
+    /// </summary>
+    [SqlMethod(Name = "EvaluateBoolean", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+    public static Boolean EvaluateBoolean(TParams AParams, String AExpression, Boolean ADefault)
+    {
+      return EvaluateBoolean(AParams, AExpression, ADefault, null);
+    }
+
+/*
+    /// <summary>
+    /// Вычисляет произвольное математическое выражение, используя обратный вызов срезы SQL
+    /// </summary>
+    [SqlMethod(Name = "Evaluate", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
     public object Evaluate(String AExpression)
     {
       return Evaluate(this, AExpression);
@@ -313,11 +340,12 @@ namespace UDT
     /// <summary>
     /// Вычисляет произвольное логическое выражение, используя обратный вызов срезы SQL
     /// </summary>
-    [SqlMethod(Name = "EvaluateBoolean", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read)]
+    [SqlMethod(Name = "EvaluateBoolean", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
     public Boolean EvaluateBoolean(String AExpression, Boolean ADefault)
     {
       return EvaluateBoolean(this, AExpression, ADefault);
     }
+*/
 
     /// <summary>
     /// Добавляет параметр, если существует переопределяет его значение и возвращает подготовленные параметры
@@ -367,26 +395,44 @@ namespace UDT
       base.MergeParams(value);
     }
 
+    //[
+    //  System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"),
+    //  SqlMethod(Name = "Merge", IsDeterministic = true, IsMutator = false, OnNullCall = true)
+    // ]
+    //public TParams Merge(TParams value)
+    //{
+    //  base.MergeParams(value);
+    //  return this;
+    //}
+
+    /// <summary>
+    /// Объединяет параметры (Статическая версия)
+    /// </summary>
     [
       System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"),
-      SqlMethod(Name = "Merge", IsDeterministic = true, IsMutator = false, OnNullCall = true)
-     ]
-    public TParams Merge(TParams value)
+      SqlMethod(Name = "Merge", IsMutator = false, OnNullCall = true, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)
+    ]
+    public static TParams Merge(TParams Value1, TParams Value2)
     {
-      base.MergeParams(value);
-      return this;
+      if(Value2 == null)
+        return Value1;
+      else if(Value1 == null)
+        return Value2;
+
+      Value1.MergeParams(Value2);
+      return Value1;
     }
 
     /// <summary>
     /// Удаляет параметр
     /// </summary>
-    [SqlMethod(Name = "DeleteParam", IsMutator = true, OnNullCall = false)]
+    [SqlMethod(Name = "DeleteParam", IsMutator = true, OnNullCall = false, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
     public new void DeleteParam(String Name)
     {
       base.DeleteParam(Name);
     }
 
-    [SqlMethod(Name = "Delete", IsDeterministic = true, IsMutator = false, OnNullCall = false)]
+    [SqlMethod(Name = "Delete", IsMutator = false, OnNullCall = false, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
     public TParams Delete(String Name)
     {
       base.DeleteParam(Name);
@@ -394,15 +440,78 @@ namespace UDT
     }
 
     /// <summary>
+    /// Удаляет параметры
+    /// </summary>
+    [SqlMethod(Name = "DeleteParams", IsMutator = true, OnNullCall = false, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+    public new void DeleteParams(String Names, Boolean InsteadOf = false)
+    {
+      base.DeleteParams(Names, InsteadOf);
+    }
+
+    /// <summary>
+    /// Загружает параметры
+    /// </summary>
+    [SqlMethod(Name = "Load", IsMutator = true, OnNullCall = true, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+    public void Load(TParams ASource, String AAliases, Char ALoadValueCondition = 'A')
+    {
+      base.Load(ASource, AAliases, Pub.LoadValueConditionParser(ALoadValueCondition));
+    }
+
+    /// <summary>
+    /// Перегружает параметры (Статическая версия)
+    /// </summary>
+    [SqlMethod(Name = "Overwrite", IsMutator = false, OnNullCall = true, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+    public static TParams Overwrite(TParams AStorage, TParams ALoad, String ALoadAliases, Char ALoadValueCondition = 'A')
+    {
+      if(AStorage == null && ALoad == null)
+        return null;
+      if(String.IsNullOrEmpty(ALoadAliases))
+        return AStorage;
+
+      Boolean LNullStorage = (AStorage == null);
+      if(LNullStorage)
+        AStorage = TParams.New() ;
+      AStorage.Load(ALoad, ALoadAliases, Pub.LoadValueConditionParser(ALoadValueCondition));
+
+      return (AStorage.Count > 0 || !LNullStorage) ? AStorage : null; 
+    }
+
+    /// <summary>
+    /// Извлекает параметры
+    /// </summary>
+    [SqlMethod(Name = "Copy", IsMutator = false, OnNullCall = false, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+    public TParams Copy(String Names)
+    {
+      if(String.IsNullOrWhiteSpace(Names))
+        return null;
+
+      TParams LResult = TParams.New();
+      LResult.Load(this, Names, TLoadValueCondition.lvcIfReceive);
+      return LResult.Count > 0 ? LResult : null;
+    }
+
+    /// <summary>
     /// Сравнивает параметры
     /// </summary>
     [
       System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"),
-      SqlMethod(Name = "Equals", IsDeterministic = true, OnNullCall = true)
+      SqlMethod(Name = "Equals", IsDeterministic = true, OnNullCall = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)
     ]
     public bool Equals(TParams args)
     {
       return base.Equals(args);
+    }
+
+    /// <summary>
+    /// Сверяет два набора
+    /// </summary>
+    [SqlFunction(Name = "Is Equal", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+    public static Boolean Equal(TParams AParams1, TParams AParams2)
+    {
+      if (AParams1 == null && AParams2 == null) return true;
+      if (AParams1 == null || AParams2 == null) return false;
+
+      return AParams1.Equals(AParams2);
     }
 
     /// <summary>
@@ -658,18 +767,6 @@ namespace UDT
     }
 
     /// <summary>
-    /// Сверяет два набора
-    /// </summary>
-    [SqlFunction(Name = "Is Equal", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-    public static Boolean IsEqual(TParams AParams1, TParams AParams2)
-    {
-      if (AParams1 == null && AParams2 == null) return true;
-      if (AParams1 == null || AParams2 == null) return false;
-
-      return AParams1.Equals(AParams2);
-    }
-
-    /// <summary>
     /// Возвращает коллекцию TListString
     /// </summary>
     [SqlMethod(Name = "AsTListString", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
@@ -865,22 +962,30 @@ namespace UDT
 
 
   [Serializable]
-  [SqlUserDefinedAggregate(Format.UserDefined, IsInvariantToNulls = true, IsInvariantToDuplicates = false, IsInvariantToOrder = false, MaxByteSize = -1)]
+  [
+    SqlUserDefinedAggregate
+    (
+      Format.UserDefined, 
+      IsNullIfEmpty           = true,
+      IsInvariantToNulls      = true, 
+      IsInvariantToDuplicates = false, 
+      IsInvariantToOrder      = false, 
+      MaxByteSize             = -1
+    )
+  ]
   public class TParamsAggregate: IBinarySerialize
   {
     private TParams OResult;
 
     public void Init()
     {
-      OResult = new TParams();
+      OResult = TParams.New();
     }
 
     public void Accumulate(String AName, Object AValue)
     {
-      if (AValue == null) 
-        return;
-
-		  OResult.AddParam(AName, AValue);
+      if (!(AValue is DBNull))
+		    OResult.AddParam(AName, AValue);
     }
 
     public void Merge(TParamsAggregate AOther)
@@ -899,17 +1004,131 @@ namespace UDT
 
     public void Read(System.IO.BinaryReader r)
     {
-      //if (r == null) throw new ArgumentNullException("r");
       if(OResult == null)
-        OResult = new TParams();
+        OResult = TParams.New();
       OResult.Read(r);
     }
 
     public void Write(System.IO.BinaryWriter w)
     {
-      //if (w == null) throw new ArgumentNullException("w");
       if(OResult != null)
         OResult.Write(w);
     }
   }
+
+  [Serializable]
+  [
+    SqlUserDefinedAggregate
+    (
+      Format.UserDefined,
+      IsNullIfEmpty           = true,
+      IsInvariantToNulls      = true, 
+      IsInvariantToDuplicates = false, 
+      IsInvariantToOrder      = false, 
+      MaxByteSize             = -1
+    )
+  ]
+  public class TParamsAggregateText: IBinarySerialize
+  {
+    private TParams OResult;
+
+    public void Init()
+    {
+      OResult = TParams.New();
+    }
+
+    public void Accumulate(String AName, String ATextValue, String AType)
+    {
+      if (ATextValue != null)
+		    OResult.AddParam(AName, INT.TParams.TextToValue(ATextValue, AType));
+    }
+
+    public void Merge(TParamsAggregateText AOther)
+    {
+      if(AOther != null && AOther.OResult != null)
+        OResult.MergeParams(AOther.OResult);
+    }
+
+    public TParams Terminate()
+    {
+      if (OResult != null && OResult.Count > 0)
+        return OResult;
+      else
+        return null;
+    }
+
+    public void Read(System.IO.BinaryReader r)
+    {
+      if(OResult == null)
+        OResult = TParams.New();
+      OResult.Read(r);
+    }
+
+    public void Write(System.IO.BinaryWriter w)
+    {
+      if(OResult != null)
+        OResult.Write(w);
+    }
+  }
+
+
+  //[Serializable]
+  //[
+  //  SqlUserDefinedAggregate
+  //  (
+  //    Format.UserDefined,
+  //    IsNullIfEmpty           = true,
+  //    IsInvariantToNulls      = true, 
+  //    IsInvariantToDuplicates = false, 
+  //    IsInvariantToOrder      = false, 
+  //    MaxByteSize             = -1
+  //  )
+  //]
+  //public class TParamsAggregateEx: IBinarySerialize
+  //{
+  //  private TParams OResult;
+
+  //  public void Init()
+  //  {
+  //    OResult = new TParams();
+  //  }
+
+  //  public void Accumulate(String AName, Object AVariantValue, SqlChars AStringValue, SqlBytes ABinaryValue)
+  //  {
+  //    if (!(AVariantValue is DBNull))
+		//    OResult.AddParam(AName, AVariantValue);
+  //    else if (!AStringValue.IsNull)
+		//    OResult.AddParam(AName, AStringValue);
+  //    else if (!ABinaryValue.IsNull)
+		//    OResult.AddParam(AName, ABinaryValue);
+  //    //else return;
+  //  }
+
+  //  public void Merge(TParamsAggregateEx AOther)
+  //  {
+  //    if(AOther != null && AOther.OResult != null)
+  //      OResult.MergeParams(AOther.OResult);
+  //  }
+
+  //  public TParams Terminate()
+  //  {
+  //    if (OResult != null && OResult.Count > 0)
+  //      return OResult;
+  //    else
+  //      return null;
+  //  }
+
+  //  public void Read(System.IO.BinaryReader r)
+  //  {
+  //    if(OResult == null)
+  //      OResult = new TParams();
+  //    OResult.Read(r);
+  //  }
+
+  //  public void Write(System.IO.BinaryWriter w)
+  //  {
+  //    if(OResult != null)
+  //      OResult.Write(w);
+  //  }
+  //}
 }

@@ -71,10 +71,14 @@
     </Reference>
     <Reference Include="System.Data" />
     <Reference Include="System.Xml" />
-    <Reference Include="UDF.Pubs, Version=1.0.5501.28428, Culture=neutral, processorArchitecture=MSIL">
-      <SpecificVersion>False</SpecificVersion>
+    <Reference Include="UDF.Pubs">
       <HintPath>..\Sql.UDF.Pubs\bin\Release\UDF.Pubs.dll</HintPath>
-      <Private>False</Private>
+    </Reference>
+    <Reference Include="UDF.Pubs.Formats">
+      <HintPath>..\Sql.UDF.Pubs.Formats\bin\Release\UDF.Pubs.Formats.dll</HintPath>
+    </Reference>
+    <Reference Include="UDF.Pubs.Strings">
+      <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
     </Reference>
     <Reference Include="UDT.TList">
       <HintPath>..\Sql.UDT.TList\bin\Release\UDT.TList.dll</HintPath>

@@ -24,7 +24,7 @@ public static class DynamicSQL
 
     if(String.IsNullOrEmpty(AQuery)) return AQuery;
 
-    return "EXEC(" + Pub.Quote(AQuery, '\'') + ") AT " + Pub.Quote(ALinkedServer, '[');
+    return "EXEC(" + Strings.Quote(AQuery, '\'') + ") AT " + Strings.Quote(ALinkedServer, '[');
   }
 
   //[SqlFunction(Name = "Final SQL(Custom)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
@@ -35,8 +35,8 @@ public static class DynamicSQL
 
     StringBuilder Result = new StringBuilder(ASQL.Length);
 
-    SQLParamsParser Parser =
-      new SQLParamsParser
+    Sql.ParamsParser Parser =
+      new Sql.ParamsParser
           (
             ASQL,
             ':',
@@ -60,7 +60,7 @@ public static class DynamicSQL
         else if(Parser.Current.Value[0] == '$')
         {
           String LValues = (Parser.Current.Value.Length == 1 ? AParams.ToString() : AParams.ToStringEx(Parser.Current.Value.Substring(1)));
-          Result.Append(LValues == null ? "NULL" : Pub.QuoteString(LValues));
+          Result.Append(LValues == null ? "NULL" : Strings.QuoteString(LValues));
         }
         else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))
         {
@@ -134,7 +134,7 @@ public static class DynamicSQL
         if (!reader.Read()) return null;
 
         reader.GetSqlValues(values);
-        UDT.TParams LFields = new UDT.TParams();
+        UDT.TParams LFields = UDT.TParams.New();
         for (int i = reader.FieldCount - 1; i >= 0; i--)
         {
           if (!reader.IsDBNull(i))
@@ -208,7 +208,7 @@ public static class DynamicSQL
             while (reader.Read())
             {
               reader.GetSqlValues(values);
-              UDT.TParams LFields = new UDT.TParams();
+              UDT.TParams LFields = UDT.TParams.New();
               for (int i = reader.FieldCount - 1; i >= 0; i--)
               {
                 if (!reader.IsDBNull(i))

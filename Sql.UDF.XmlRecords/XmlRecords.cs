@@ -3,6 +3,7 @@ using System.IO;
 using System.Data;
 using System.Data.SqlClient;
 using Microsoft.SqlServer.Server;
+using System.Text;
 using System.Xml;
 using System.Data.SqlTypes;
 using System.Collections;
@@ -275,13 +276,16 @@ public partial class XmlRecords
   [SqlFunction(Name = "XML Record::New Attribute", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String XMLRecordNewAttribute(SqlXml DataXml, String ATag, String AAttributeName, String AAttributeValue)
   {
-    if (DataXml.IsNull || AAttributeValue == null) return null;
+    if (DataXml.IsNull) return null;
 
     if(String.IsNullOrWhiteSpace(ATag))
       throw new System.Exception("Parameter @Tag can't be null or empty");
 
     if(String.IsNullOrWhiteSpace(AAttributeName))
       throw new System.Exception("Parameter @AttributeName can't be null or empty");
+
+    if(AAttributeValue == null) //return DataXml.Value;
+      throw new System.Exception("Parameter @AttributeValue can't be null");
 
     XmlDocument UpdateDoc = new XmlDocument();
     XmlNode UpdateRoot = UpdateDoc.CreateElement("RECORDS");
@@ -301,17 +305,21 @@ public partial class XmlRecords
     return UpdateRoot.ChildNodes.Count == 0 ? null : UpdateRoot.InnerXml;
   }
 
-  [SqlFunction(Name = "XML Record::InnerXml", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [
+    SqlFunction
+    (
+      Name              = "XML Record::InnerXml",
+      DataAccess        = DataAccessKind.None,
+      SystemDataAccess  = SystemDataAccessKind.None,
+      IsDeterministic   = true
+    )
+  ]
+  // RETURNS NULL ON NULL INPUT
   public static String XMLRecordInnerXml(SqlXml AXml, String ATag)
   {
-    if(String.IsNullOrWhiteSpace(ATag))
-      throw new System.Exception("Parameter @Tag can't be null or empty");
-
-    if (AXml.IsNull)
-      return null;
-
     XmlReader LReader = AXml.CreateReader();
-    while(LReader.Read())
+    LReader.Read();
+    while(!LReader.EOF)
     {
       if(LReader.NodeType == XmlNodeType.Element)
       {
@@ -324,11 +332,53 @@ public partial class XmlRecords
             return LInnerXml;
         }
         else
-          LReader.Skip();
+        {
+          if (!LReader.IsEmptyElement)
+            LReader.Skip();
+          else
+            LReader.Read();
+        }
       }
+      else
+        LReader.Read();
     }
 
     return null;
+  }
+
+  [
+    SqlFunction
+    (
+      Name              = "XML Records::Copy", 
+      DataAccess        = DataAccessKind.None, 
+      SystemDataAccess  = SystemDataAccessKind.None, 
+      IsDeterministic   = true
+    )
+  ]
+  // RETURNS NULL ON NULL INPUT
+  public static String XMLRecordsCopy(SqlXml AXml, String ATags)
+  {
+    StringBuilder LResult = new StringBuilder();
+
+    ATags = ';' + ATags + ';';
+    XmlReader LReader = AXml.CreateReader();
+    LReader.Read();
+    while(!LReader.EOF)
+    {
+      if(LReader.NodeType == XmlNodeType.Element)
+      {
+        if (ATags.IndexOf(';' + LReader.Name + ';') >= 0)
+          LResult.Append(LReader.ReadOuterXml());
+        else if (!LReader.IsEmptyElement)
+          LReader.Skip();
+        else
+          LReader.Read();
+      }
+      else
+        LReader.Read();
+    }
+
+    return LResult.Length > 0 ? LResult.ToString() : null;
   }
 
   private struct XMLRecordAttribute

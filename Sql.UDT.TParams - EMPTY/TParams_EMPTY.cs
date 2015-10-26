@@ -2191,10 +2191,17 @@ namespace UDT_EMPTY
         {
           base.AddParam(name, value);
         }
+
         [SqlMethod(Name = "Evaluate", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read)]
-        public object Evaluate(String AExpression)
+        public static object Evaluate(TParams_EMPTY AParams, String AExpression)
         {
           return null;
+        }
+
+        [SqlMethod(Name = "EvaluateBoolean", IsMutator = false, OnNullCall = false, DataAccess = DataAccessKind.Read)]
+        public static Boolean EvaluateBoolean(TParams_EMPTY AParams, String AExpression, Boolean ADefault = false)
+        {
+          return ADefault;
         }
 
 
@@ -2258,10 +2265,23 @@ namespace UDT_EMPTY
         /// <summary>
         /// Сравнивает параметры
         /// </summary>
-				[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"), SqlMethod(Name = "Equals", OnNullCall = true)]
+				[
+          System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"), 
+          SqlMethod
+          (
+            Name = "Equals", 
+            OnNullCall = true
+          )
+        ]
         public bool Equals(TParams_EMPTY args)
         {
-            return base.Equals(args);
+          return base.Equals(args);
+        }
+
+				[SqlMethod(Name = "Equal", OnNullCall = true)]
+        public static bool Equal(TParams_EMPTY args1, TParams_EMPTY args2)
+        {
+          return false;
         }
 
         /// <summary>

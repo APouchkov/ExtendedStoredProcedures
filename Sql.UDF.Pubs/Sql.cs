@@ -1,6 +1,7 @@
 ﻿using System;
 //using System.Collections;
 //using System.Collections.Generic;
+using System.Linq;
 using System.Text;
 using System.Globalization;
 using System.Xml;
@@ -133,6 +134,42 @@ public class Sql
     }
   }
 */
+
+  public static Boolean InternalParseEOQ(char ARightQuote, String AString, ref int AOffset, out String AValue, char[] ANextChars)
+  {
+    int LPos, LNextPos;
+    char LNextChar;
+
+    AValue = "";
+    LPos = AOffset;
+    for (; ; )
+    {
+      LNextPos = AString.IndexOf(ARightQuote, LPos);
+      if (LNextPos == 0)
+        return false;
+
+      AValue += AString.Substring(LPos, LNextPos - LPos);
+      LPos = LNextPos + 1;
+      if (LPos >= AString.Length)
+        LNextChar = (char)0;
+      else
+        LNextChar = AString[LPos];
+
+      if (LNextChar == ARightQuote)
+      {
+        LPos++;
+        AValue += ARightQuote;
+      }
+      else if ((ANextChars.Length == 0) || ANextChars.Contains(LNextChar))
+        break;
+      else
+        return false;
+    }
+
+    AOffset = LPos;
+    return true;
+  }
+
 
 #region Converting Params
 
@@ -302,7 +339,10 @@ public class Sql
           return (String)(SqlString)value;
 
       case SqlDbType.Binary         :
-      case SqlDbType.VarBinary      : return (value is SqlBinary) ? Convert.ToBase64String(((SqlBinary)value).Value) : Convert.ToBase64String(((SqlBytes)value).Value);
+      case SqlDbType.VarBinary      : return (value is SqlBinary) ?
+                                        Convert.ToBase64String(((SqlBinary)value).Value, Base64FormattingOptions.None)
+                                        :
+                                        Convert.ToBase64String(((SqlBytes)value).Value, Base64FormattingOptions.None);
 
       case SqlDbType.DateTime       : return (style == ValueDbStyle.XML) ?
                                         XmlConvert.ToString((DateTime)(SqlDateTime)value, XmlDateTimeSerializationMode.RoundtripKind)
@@ -384,7 +424,7 @@ public class Sql
   {
     String LResult = ValueToString(AValue, AStyle);
     if (IsQuoteType(GetSqlType(AValue)))
-      LResult = Pub.Quote(LResult, AQuote);
+      LResult = Strings.Quote(LResult, AQuote);
     return LResult;
   }
 
@@ -491,6 +531,13 @@ public class Sql
     return ValueFromString(AValue, (SqlDbType)Enum.Parse(typeof(SqlDbType), AType, true), (ValueDbStyle)Enum.Parse(typeof(ValueDbStyle), AStyle, true));
   }
 
+  [SqlFunction(Name = "CastStringAsVarbinary", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static SqlBytes CastStringAsVarbinary(String AValue)
+  { 
+    return new SqlBytes(Convert.FromBase64String(AValue));
+  }
+
   [SqlFunction(Name = "VariantReCast", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // WITH RETURNS NULL ON NULL INPUT
   public static Object VariantReCast(Object AValue, String AType)
@@ -503,6 +550,297 @@ public class Sql
         ValueDbStyle.XML
       );
   }
-
 #endregion Converting Params
+
+  public struct TParamParseItem
+  {
+    public String   Gap;
+    public Char     Quote;
+    public String   Value;
+    public Boolean  Eof;
+  }
+
+  public class ParamsParser
+  {
+    private String FString;
+    private Char FPrefix;
+    private TCommentMethods FComments; // TCommentMethods
+    private Char[] FQuotes;
+    private Char[] FLiterals;
+
+    private Char FCurrChar;
+    private Char FNextChar;
+
+    private int FLength;
+    private int FPosition;
+
+    private TParamParseItem FCurrent;
+    public TParamParseItem Current { get { return FCurrent; } }
+
+    public ParamsParser(String ACommandText, Char APrefix, TCommentMethods AComments, Char[] AQuotes, Char[] ALiterals)
+    {
+      FString = ACommandText;
+      FPrefix = APrefix;
+      FComments = AComments;
+      FQuotes = AQuotes;
+      FLiterals = ALiterals;
+
+      FPosition = -1;
+      FLength = FString.Length;
+      MoveToNextChar();
+      FCurrent.Gap = "";
+      FCurrent.Quote = (Char)0;
+      FCurrent.Value = "";
+    }
+
+    private void MoveToNextChar(Boolean AIncPosition = true)
+    {
+      if(AIncPosition)
+        FPosition++;
+
+      if (FPosition < FLength)
+        FCurrChar = FString[FPosition];
+      else
+      {
+        FCurrChar = '\0';
+        FCurrent.Eof = true;
+      }
+
+      if (FPosition < FLength - 1)
+        FNextChar = FString[FPosition + 1];
+      else
+        FNextChar = '\0';
+    }
+
+    private char[] NameDelimeters = new char[] { ' ', '!', '$', '?', ')', '<', '>', '=', '+', '-', '*', '/', '\\', '%', '^', '&', '|', ',', ';', '\'', '"', '`', (char)13, (char)10, (char)0 };
+    private Boolean NameDelimiter(Char AChar)
+    {
+      return NameDelimeters.Contains(AChar);
+    }
+
+    private void SkipText(ref int LPosition, Boolean AIncludeCurrent)
+    {
+      int LWidth = FPosition - LPosition;
+      if (AIncludeCurrent) LWidth++;
+      FCurrent.Gap = FCurrent.Gap + FString.Substring(LPosition, LWidth);
+      LPosition = FPosition + 1;
+    }
+
+    public Boolean MoveNext()
+    {
+      int LPosition;
+      TCommentMethod LCurrComment;
+
+      if (FCurrent.Eof)
+        return false;
+
+      FCurrent.Gap = "";
+      LPosition = FPosition;
+      LCurrComment = TCommentMethod.None;
+
+      for (;;) /*(FPosition <= FLength)*/
+      {
+        switch (LCurrComment)
+        {
+          case TCommentMethod.Lattice:
+          case TCommentMethod.DoubleMinus:
+          case TCommentMethod.DoubleSlash:
+            if (FCurrChar == (char)10 || FCurrChar == (char)13 || FCurrChar == (char)0)
+              LCurrComment = TCommentMethod.None;
+            MoveToNextChar();
+            continue;
+          case TCommentMethod.SlashRange:
+            {
+              if ((FCurrChar == '*') && (FNextChar == '/'))
+              {
+                LCurrComment = TCommentMethod.None;
+                FPosition++;
+              }
+              MoveToNextChar();
+              continue;
+            }
+          case TCommentMethod.BracketRange:
+            {
+              if ((FCurrChar == '*') && (FNextChar == ')'))
+              {
+                LCurrComment = TCommentMethod.None;
+                FPosition++;
+              }
+              MoveToNextChar();
+              continue;
+            }
+          case TCommentMethod.Braces:
+            {
+              if (FCurrChar == '}')
+                LCurrComment = TCommentMethod.None;
+              MoveToNextChar();
+              continue;
+            }
+        }
+
+        switch (FCurrChar)
+        {
+          case '#':
+            if ((TCommentMethods.Lattice & FComments) != 0)
+            {
+              LCurrComment = TCommentMethod.Lattice;
+              MoveToNextChar();
+              continue;
+            }
+            else break;
+          case '{':
+            if ((TCommentMethods.Braces & FComments) != 0)
+            {
+              LCurrComment = TCommentMethod.Braces;
+              MoveToNextChar();
+              continue;
+            }
+            else break;
+          case '-':
+            if (((TCommentMethods.DoubleMinus & FComments) != 0) && (FNextChar == '-'))
+            {
+              LCurrComment = TCommentMethod.DoubleMinus;
+              FPosition++;
+              MoveToNextChar();
+              continue;
+            }
+            else break;
+          case '/':
+            if (((TCommentMethods.DoubleSlash & FComments) != 0) && (FNextChar == '/'))
+            {
+              LCurrComment = TCommentMethod.DoubleSlash;
+              FPosition++;
+              MoveToNextChar();
+              continue;
+            }
+            else if (((TCommentMethods.SlashRange & FComments) != 0) && (FNextChar == '*'))
+            {
+              LCurrComment = TCommentMethod.SlashRange;
+              FPosition++;
+              MoveToNextChar();
+              continue;
+            }
+            else break;
+          case '(':
+            if (((TCommentMethods.BracketRange & FComments) != 0) && (FNextChar == '*'))
+            {
+              LCurrComment = TCommentMethod.BracketRange;
+              FPosition++;
+              MoveToNextChar();
+              continue;
+            }
+            else break;
+          case (char)0:
+            SkipText(ref LPosition, false);
+            FCurrent.Quote = (Char)0;
+            FCurrent.Value = "";
+            FCurrent.Eof = true;
+            return true;
+          default:
+            if (FCurrChar == FPrefix)
+              if (FNextChar == FPrefix)
+              {
+                FPosition++;
+                SkipText(ref LPosition, false);
+                MoveToNextChar();
+                continue;
+              }
+              else
+              {
+                SkipText(ref LPosition, false);
+                MoveToNextChar();
+                FCurrent.Quote = Strings.InternalGetRightQuote(FCurrChar, FQuotes);
+                if (FCurrent.Quote != (char)0)
+                {
+                  FPosition++;
+                  if (InternalParseEOQ(FCurrent.Quote, FString, ref FPosition, out FCurrent.Value, new char[0]))
+                  {
+                    if (String.IsNullOrEmpty(FCurrent.Value))
+                    {
+                      LPosition--;
+                      SkipText(ref LPosition, false);
+                    }
+                    else
+                    {
+                      LPosition = FPosition;
+                      FCurrent.Eof = (FPosition >= FLength);
+                      if(!FCurrent.Eof) MoveToNextChar(false);
+                      return true;
+                    }
+                  }
+                  else
+                  {
+                    LPosition--;
+                    FPosition = FLength;
+                    SkipText(ref LPosition, true);
+                    FCurrent.Quote = (Char)0;
+                    FCurrent.Value = "";
+                    FCurrent.Eof = true;
+                    return true;
+                  }
+                }
+                else
+                {
+                  while (!NameDelimiter(FCurrChar))
+                    MoveToNextChar();
+                  if (LPosition == FPosition)
+                    LPosition--;
+                  else
+                  {
+                    FCurrent.Value = FString.Substring(LPosition, FPosition - LPosition);
+                    FCurrent.Eof = (FPosition >= FLength);
+                    return true;
+                  }
+                }
+                break;
+              }
+            else
+              break;
+        }
+
+        if (FLiterals.Contains(FCurrChar))
+        {
+          Char LEndChar = Strings.InternalGetRightQuote(FCurrChar);
+          do
+          {
+            MoveToNextChar();
+            if (FCurrChar == LEndChar)
+              if (FNextChar == LEndChar)
+              {
+                MoveToNextChar();
+                //SkipText(ref LPosition, false);
+                //FPosition++;
+              }
+              else
+              {
+                MoveToNextChar();
+                break;
+              }
+          } while (FPosition < FLength);
+        }
+        else
+          MoveToNextChar();
+      }
+
+    }
+  }
+
+  [SqlFunction(Name = "Trim VarBinary", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static SqlBinary TrimVarBinary(SqlBinary AValue)
+  {
+    if ((AValue.Value.Length == 0) || (AValue.Value[0] > 0))
+      return AValue;
+
+    for (int I = 0; I < AValue.Value.Length; I++)
+    {
+      if (AValue.Value[I] > 0)
+      {
+        byte[] result = new byte[AValue.Value.Length - I];
+        Array.Copy(AValue.Value, I, result, 0, result.Length);
+        return new SqlBinary(result);
+      }
+    }
+    return new SqlBinary(new byte[] { 0 });
+  }
 }

@@ -21,13 +21,14 @@ namespace INT
   public class TParams : IBinarySerialize, IXmlSerializable
   {
     private const String ListSeparator = ";";
-    private const String Const_ContextConnection = "context connection=true";
+    protected const String Const_ContextConnection = "context connection=true";
 
     /// <summary>
     /// Инициализация объекта
     /// </summary>
     public void Init()
     {
+      //FData = new SortedList<String, Object>(StringComparer.OrdinalIgnoreCase);
     }
 
     /// <summary>
@@ -94,26 +95,63 @@ namespace INT
 
       // Параметры
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
-        if (LDataPair.Key[0] == '=') continue;
-        SqlDbType type = Sql.GetSqlType(LDataPair.Value);
-        w.Append
-        (
-          (w.Length == 0 ? "" : ListSeparator)
-          +
-          String.Format
+        if (LDataPair.Key[0] != '=')
+        {
+          SqlDbType type = Sql.GetSqlType(LDataPair.Value);
+          w.Append
           (
-            "{0}{1}={2}", 
-            EncodeName(LDataPair.Key),
-            type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LDataPair.Value).TypeName : type.ToString())),
-            Sql.IsQuoteType(type) ?
-              Pub.Quote(Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL), '"')
-              :
-              Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL))
-          );
-      }
+            (w.Length == 0 ? "" : ListSeparator)
+            +
+            String.Format
+            (
+              "{0}{1}={2}", 
+              EncodeName(LDataPair.Key),
+              type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LDataPair.Value).TypeName : type.ToString())),
+              Sql.IsQuoteType(type) ?
+                Strings.Quote(Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL), '"')
+                :
+                Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL))
+            );
+        }
 
       return w.ToString();
+    }
+
+    /// <summary>
+    /// Преобразует данные в строку XML
+    /// </summary>
+    /// <returns>Возвращает список параметров строкой XML</returns>
+    public String ToXMLString(String AElement = null)
+    {
+      StringBuilder sb = new StringBuilder();
+      XmlWriterSettings s = new XmlWriterSettings();
+      s.ConformanceLevel = ConformanceLevel.Fragment;
+      s.Indent = true;
+      XmlWriter w = XmlWriter.Create(sb, s);
+      //w.Settings.
+
+      if(AElement != null)
+        w.WriteStartElement(AElement);
+
+      foreach (KeyValuePair<String, Object> LDataPair in FData)
+      {
+        String LName  = XmlConvert.EncodeLocalName(LDataPair.Key);
+        String LValue = Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.XML);
+        if (AElement != null)
+        {
+          w.WriteStartAttribute(LName);
+          w.WriteValue(LValue);
+          w.WriteEndAttribute();
+        }
+        else
+          w.WriteElementString(LName, LValue);
+      }
+
+      if(AElement != null)
+        w.WriteEndElement();
+
+      w.Close();
+      return sb.ToString();
     }
 
     /// <summary>
@@ -141,13 +179,23 @@ namespace INT
             EncodeName(LName),
             type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LValue).TypeName : type.ToString())),
             Sql.IsQuoteType(type) ?
-              Pub.Quote(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL), '"')
+              Strings.Quote(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL), '"')
               :
               Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL))
           );
       }
 
       return w.Length == 0 ? null : w.ToString();
+    }
+
+    public static Object TextToValue(String AValue, String AType)
+    {
+      SqlDbType LSqlDbType = Sql.TypeFromString(AType);
+
+      if (LSqlDbType == SqlDbType.Udt)
+        return new SqlUdt(AType, AValue);
+      else
+        return Sql.ValueFromString(AValue, LSqlDbType, Sql.ValueDbStyle.SQL);
     }
 
     /// <summary>
@@ -241,19 +289,15 @@ namespace INT
             try
             {
               // Парсим значение
-              String    SValue = s.Substring(startValue, i - startValue);
-              SqlDbType dbType = Sql.TypeFromString(LType);
-              if (Sql.IsQuoteType(dbType)) SValue = Pub.UnQuote(SValue, new Char[] {'"'});
+              String  SValue = s.Substring(startValue, i - startValue);
+              SqlDbType LSqlDbType = Sql.TypeFromString(LType);
+              if (Sql.IsQuoteType(LSqlDbType)) SValue = Strings.UnQuote(SValue, new Char[] {'"'});
 
               Object LValue;
-              if(dbType == SqlDbType.Udt)
-              {
+              if(LSqlDbType == SqlDbType.Udt)
                 LValue = new SqlUdt(LType, SValue);
-                //LValue = CreateUdtObject(LType);
-                //LValue.GetType().InvokeMember("FromString", BindingFlags.InvokeMethod, null, LValue, new Object[]{SValue});
-              }
               else
-                LValue = Sql.ValueFromString(SValue, dbType, Sql.ValueDbStyle.SQL);
+                LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
 
               // Добавляем параметр
               AddParam(DecodeName(LName), LValue);
@@ -1131,7 +1175,7 @@ namespace INT
       }
       else if (value is SqlXml)
       {
-        TParams result = new TParams();
+        TParams result = TParams::New();
         result.ReadXml((value as SqlXml).CreateReader());
         return result;
       }
@@ -1169,9 +1213,9 @@ namespace INT
     {
       StringBuilder sb = new StringBuilder();
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
-        if (LDataPair.Key[0] != '=') sb.Append((sb.Length == 0 ? "" : ";") + LDataPair.Key);
-      }
+        if (LDataPair.Key[0] != '=')
+          sb.Append((sb.Length == 0 ? "" : ";") + LDataPair.Key);
+
       return sb.ToString();
     }
 
@@ -1187,7 +1231,6 @@ namespace INT
       TParamRow Row;
 
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
         if (/*AIncludePrepared ||*/ LDataPair.Key[0] != '=')
         {
           Row.Name  = LDataPair.Key;
@@ -1195,7 +1238,6 @@ namespace INT
           Row.Value = LDataPair.Value;
           Rows.Add(Row);
         }
-      }
 
       return Rows;
     }
@@ -1216,7 +1258,6 @@ namespace INT
       TParamStringRow Row;
 
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
         if (LDataPair.Key[0] != '=')
         {
           Row.Name  = LDataPair.Key;
@@ -1224,7 +1265,6 @@ namespace INT
           Row.Value = Sql.ValueToString(LDataPair.Value, LStyle);
           Rows.Add(Row);
         }
-      }
 
       return Rows;
     }
@@ -1303,11 +1343,13 @@ namespace INT
 
       if (AParams == null) return true;
       foreach (KeyValuePair<String, Object> LDataPair in AParams.FData)
-      {
-        Object LValue;
-        if (FData.TryGetValue(LDataPair.Key, out LValue))
-          if (!EqualValues(LValue, LDataPair.Value)) return false;
-      }
+        if (LDataPair.Key[0] != '=')
+        {
+          Object LValue;
+          if (FData.TryGetValue(LDataPair.Key, out LValue))
+            if (!EqualValues(LValue, LDataPair.Value))
+              return false;
+        }
       return true;
     }
 
@@ -1341,12 +1383,45 @@ namespace INT
     /// <summary>
     /// Объединяет два списка параметров и возвращает результат
     /// </summary>
-    protected void MergeParams(TParams AValue)
+    protected void MergeParams(TParams ASource)
     {
-      if (AValue == null) return;
-      foreach (KeyValuePair<String, Object> LDataPair in AValue.FData)
+      if (ASource == null) return;
+      foreach (KeyValuePair<String, Object> LDataPair in ASource.FData)
+        if (LDataPair.Key[0] != '=')
+          AddParam(LDataPair.Key, LDataPair.Value);
+    }
+
+    /// <summary>
+    /// Удаляет параметры из списка параметров
+    /// </summary>
+    /// <param name="name"></param>
+    protected void Load(TParams ASource, String AAliases, TLoadValueCondition ALoadValueCondition = TLoadValueCondition.lvcAlways)
+    {
+      if (ASource == null) return;
+
+      String LTarget, LSource;
+      foreach (String LAlias in AAliases.Split(';'))
       {
-        AddParam(LDataPair.Key, LDataPair.Value);
+        int LEqual = LAlias.IndexOf('=');
+        if (LEqual == -1)
+        {
+          LTarget = LAlias;
+          LSource = LAlias;
+        }
+        else
+        {
+          LTarget = LAlias.Substring(0, LEqual);
+          LSource = LAlias.Substring(LEqual + 1);
+        }
+
+        Object LValue;
+        if (ASource.FData.TryGetValue(LSource, out LValue))
+        {
+          if (ALoadValueCondition != TLoadValueCondition.lvcIfNotPresent || !FData.ContainsKey(LTarget))
+            AddParam(LTarget, LValue);
+        }
+        else if (ALoadValueCondition == TLoadValueCondition.lvcAlways)
+          AddParam(LTarget, DBNull.Value);
       }
     }
 
@@ -1357,11 +1432,33 @@ namespace INT
     protected void DeleteParam(String AName)
     {
       CheckName(AName, false);
-      //int LIndex = FData.IndexOfKey(AName);
-      //if (LIndex >= 0)
-      //  FData.RemoveAt(LIndex);
       if(FData.ContainsKey(AName))
         AddParam(AName, DBNull.Value);
+    }
+
+    /// <summary>
+    /// Удаляет параметры из списка параметров
+    /// </summary>
+    /// <param name="name"></param>
+    protected void DeleteParams(String ANames, Boolean AInsteadOf = false)
+    {
+      if (AInsteadOf)
+      {
+        ANames = ';' + ANames + ';';
+        IList<String> LKeys = FData.Keys;
+        foreach (String LKey in LKeys)
+        {
+          if (LKey[0] != '=' && ANames.IndexOf(';' + LKey + ';') == -1)
+            AddParam(LKey, DBNull.Value);
+        }
+      }
+      else
+        foreach (String LName in ANames.Split(';'))
+        {
+          CheckName(LName, false);
+          if (FData.ContainsKey(LName))
+            AddParam(LName, DBNull.Value);
+        }
     }
 
     protected bool EqualValues(Object value1, Object value2)
@@ -1395,11 +1492,12 @@ namespace INT
       if (FData.Count != AParams.FData.Count) return false;
 
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
-        Object LValue;
-        if (!AParams.FData.TryGetValue(LDataPair.Key, out LValue)) return false;
-        if (!EqualValues(LValue, LDataPair.Value)) return false;
-      }
+        if (LDataPair.Key[0] != '=')
+        {
+          Object LValue;
+          if (!AParams.FData.TryGetValue(LDataPair.Key, out LValue)) return false;
+          if (!EqualValues(LValue, LDataPair.Value)) return false;
+        }
       return true;
     }
 
@@ -1443,26 +1541,26 @@ namespace INT
       return (TParams)cmd.ExecuteScalar();
     }
 
-    public static object InternalEvaluate(TParams AParams, String AExpression)
-    { 
-      SqlConnection LContextConnection;
-      if(AParams == null)
-      { 
-        LContextConnection = new SqlConnection(Const_ContextConnection);
-        LContextConnection.Open();
-      }
-      else
-      {
-        AParams.InitContextConnection();
-        LContextConnection = AParams.ContextConnection;
-      }
+    public static object InternalEvaluate(TParams AParams, String AExpression, SqlConnection AContextConnection = null)
+    {
+      if(AContextConnection == null)
+        if(AParams == null)
+        { 
+          AContextConnection = new SqlConnection(Const_ContextConnection);
+          AContextConnection.Open();
+        }
+        else
+        {
+          AParams.InitContextConnection();
+          AContextConnection = AParams.ContextConnection;
+        }
 
-      SqlCommand LSqlCommand = LContextConnection.CreateCommand();
+      SqlCommand LSqlCommand = AContextConnection.CreateCommand();
       LSqlCommand.CommandText = AExpression; //"SELECT (" + AExpression + ")";
       LSqlCommand.CommandType = CommandType.Text;
 
-      SQLParamsParser Parser =
-        new SQLParamsParser
+      Sql.ParamsParser Parser =
+        new Sql.ParamsParser
             (
               AExpression,
               '@',
@@ -1484,18 +1582,18 @@ namespace INT
       return LSqlCommand.ExecuteScalar();
     }
 
-    public static object Evaluate(TParams AParams, String AExpression)
+    public static object Evaluate(TParams AParams, String AExpression, SqlConnection AContextConnection = null)
     {
       if (String.IsNullOrEmpty(AExpression)) return null;
 
-      return InternalEvaluate(AParams, "SELECT (" + AExpression + ")");
+      return InternalEvaluate(AParams, "SELECT (" + AExpression + ")", AContextConnection);
     }
 
-    public static Boolean EvaluateBoolean(TParams AParams, String AExpression, Boolean ADefault = false)
+    public static Boolean EvaluateBoolean(TParams AParams, String AExpression, Boolean ADefault = false, SqlConnection AContextConnection = null)
     {
       if (String.IsNullOrEmpty(AExpression)) return ADefault;
 
-      object LResult = InternalEvaluate(AParams, "SELECT Cast(1 AS Bit) WHERE (" + AExpression + ")");
+      object LResult = InternalEvaluate(AParams, "SELECT Cast(1 AS Bit) WHERE (" + AExpression + ")", AContextConnection);
       if (LResult == null || LResult == DBNull.Value) return false;
       return (Boolean)LResult;
     }
@@ -1544,7 +1642,6 @@ namespace INT
         // Добавляем новые параметры
         if (LResult.FData != null)
           foreach (KeyValuePair<String, Object> LDataPair in LResult.FData)
-          {
             if (!FData.ContainsKey(LDataPair.Key))
             {
               AddParam(LDataPair.Key, LDataPair.Value);
@@ -1552,7 +1649,6 @@ namespace INT
                 LPreparedDataItem.CalculatedParams = new List<String>();
               LPreparedDataItem.CalculatedParams.Add(LDataPair.Key.ToUpper());
             }
-          }
       }
 
 
@@ -1574,17 +1670,13 @@ namespace INT
 
       // Удаляем расчитанные параметры
       List<String> LDeleted = new List<String>();
+
       foreach (KeyValuePair<String, Object> LDataPair in FData)
-      {
         if (LDataPair.Key[0] == '=')
-        {
           LDeleted.Add(LDataPair.Key);
-        }
-      }
+
       foreach (String LParam in LDeleted)
-      {
         FData.Remove(LParam);
-      }
 
       // Убираем признак подготовленности параметров
       FPreparedData.Clear();
@@ -1827,7 +1919,7 @@ namespace INT
               case FormatTypes.Boolean:
                 try
                 {
-                  LResult.Append(Pub.FormatBoolean(LDisplayFormat, AsBit(LValue).IsTrue));
+                  LResult.Append(Formats.FormatBoolean(LDisplayFormat, AsBit(LValue).IsTrue));
                 }
                 catch (Exception E)
                 {
@@ -1842,7 +1934,7 @@ namespace INT
               case FormatTypes.Hex:
                 try
                 {
-                  LResult.Append(Pub.InternalFormatInteger(LDisplayFormat, AsBigInt(LValue).Value));
+                  LResult.Append(Formats.InternalFormatInteger(LDisplayFormat, AsBigInt(LValue).Value));
                 }
                 catch (Exception E)
                 {
@@ -1855,7 +1947,7 @@ namespace INT
               case FormatTypes.DateTime:
                 try
                 {
-                  LResult.Append(Pub.FormatDateTime2(LDisplayFormat, AsDateTime2(LValue)));
+                  LResult.Append(Formats.FormatDateTime2(LDisplayFormat, AsDateTime2(LValue)));
                 }
                 catch (Exception E)
                 {
@@ -1866,7 +1958,7 @@ namespace INT
               case FormatTypes.DateTimeOffset:
                 try
                 { 
-                  LResult.Append(Pub.FormatDateTimeOffset(LDisplayFormat, AsDateTimeOffset(LValue)));
+                  LResult.Append(Formats.FormatDateTimeOffset(LDisplayFormat, AsDateTimeOffset(LValue)));
                 }
                 catch (Exception E)
                 {
@@ -1877,7 +1969,7 @@ namespace INT
               case FormatTypes.VarChar:
               case FormatTypes.NVarChar:
               case FormatTypes.String:
-                LResult.Append(Pub.FormatString(Int16.Parse(LDisplayFormat), LValue.ToString()));
+                LResult.Append(Formats.FormatString(Int16.Parse(LDisplayFormat), LValue.ToString()));
                 break;
 
               case FormatTypes.Float:
@@ -1885,7 +1977,7 @@ namespace INT
               case FormatTypes.Numeric:
                 try
                 {
-                  LResult.Append(Pub.InternalFormatDecimal(LDisplayFormat, LValue.ToString(), "."));
+                  LResult.Append(Formats.InternalFormatDecimal(LDisplayFormat, LValue.ToString(), "."));
                 }
                 catch (Exception E)
                 {
@@ -2011,10 +2103,8 @@ namespace INT
       // Проверка целостности параметров
       if (FData != null)
         foreach (KeyValuePair<string, Object> LDataPair in FData)
-        {
           if (LDataPair.Key[0] == '=' && !IsCalculatedParams(LDataPair.Key))
             throw new Exception(String.Format("Неверное имя параметра '{0}', параметр начинающийся с '=' может быть задан(изменен) только в функции подготовки параметров", LDataPair.Key));
-        }
     }
 
     public XmlSchema GetSchema()
