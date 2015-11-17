@@ -283,7 +283,7 @@ public static class DynamicSQL
 
     try
     {
-      foreach (string MapText in AResultSets.Split(new char[] {';'}))
+      foreach (String MapText in AResultSets.Split(new char[] {';'}))
       {
         int Idx = MapText.IndexOf(':');
         if(Idx >= 0)
@@ -310,7 +310,7 @@ public static class DynamicSQL
   [SqlProcedure(Name = "Execute=>XML")]
   public static void ExecuteToXML(String AQuery, String AResultSets, out SqlXml AXml, String ATag) // , SqlBoolean AIncludeMetadata
   {
-    const string ROWSET_TAG = "ROWSET";
+    const String ROWSET_TAG = "ROWSET";
 
     if (String.IsNullOrEmpty(AQuery))
       throw new ArgumentNullException(PARAM_QUERY);
@@ -557,7 +557,7 @@ public static class DynamicSQL
     try
     {
       SqlContext.Pipe.SendResultsStart(WriteRecord);
-      object[] values = new object[FieldCount];
+      Object[] values = new Object[FieldCount];
 
       while (reader.Read())
       {
@@ -627,8 +627,8 @@ public static class DynamicSQL
     const int COLUMN_NUMERIC_SCALE      = 4;
     const int COLUMN_DATA_TYPE          = 24;
 
-    string    LTypeName   = Convert.ToString(AColumn[COLUMN_DATA_TYPE]);
-    long      LMaxLength  = Convert.ToInt32(AColumn[COLUMN_LENGTH]);
+    String    LTypeName   = Convert.ToString(AColumn[COLUMN_DATA_TYPE]);
+    Int64     LMaxLength  = Convert.ToInt64(AColumn[COLUMN_LENGTH]);
 
     if
     (

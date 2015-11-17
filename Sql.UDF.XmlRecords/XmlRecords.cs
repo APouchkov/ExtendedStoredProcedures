@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Linq;
 using System.IO;
 using System.Data;
 using System.Data.SqlClient;
@@ -11,7 +12,7 @@ using System.Collections.Generic;
 
 public partial class XmlRecords
 {
-  [SqlFunction(Name = "XML Records::Update", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "XML Records@Update", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String XMLRecordsUpdate(SqlXml Xml, SqlXml UpdateXml, String ATag, String AIdentity, Boolean ARaiseIfNotFound)
   {
     if(String.IsNullOrWhiteSpace(ATag))
@@ -138,7 +139,7 @@ public partial class XmlRecords
     return Root.ChildNodes.Count == 0 ? null : Root.InnerXml;
   }
 
-  [SqlFunction(Name = "XML Records::Cleanup", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "XML Records@Cleanup", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String XMLRecordsCleanup(SqlXml UpdateXml, String ATag, String AIdentity)
   {
     if (UpdateXml.IsNull) return null;
@@ -216,7 +217,7 @@ public partial class XmlRecords
     return UpdateRoot.ChildNodes.Count == 0 ? null : UpdateRoot.InnerXml;
   }
 
-  [SqlFunction(Name = "XML Records::Prepare", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "XML Records@Prepare", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String XMLRecordsPrepare(SqlXml UpdateXml, String ATag, String AIdentity, String AFilter)
   {
     if (UpdateXml == null || UpdateXml.IsNull) return null;
@@ -273,7 +274,7 @@ public partial class XmlRecords
     return UpdateRoot.ChildNodes.Count == 0 ? null : UpdateRoot.InnerXml;
   }
 
-  [SqlFunction(Name = "XML Record::New Attribute", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "XML Record@Add?Attribute", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   public static String XMLRecordNewAttribute(SqlXml DataXml, String ATag, String AAttributeName, String AAttributeValue)
   {
     if (DataXml.IsNull) return null;
@@ -306,13 +307,7 @@ public partial class XmlRecords
   }
 
   [
-    SqlFunction
-    (
-      Name              = "XML Record::InnerXml",
-      DataAccess        = DataAccessKind.None,
-      SystemDataAccess  = SystemDataAccessKind.None,
-      IsDeterministic   = true
-    )
+    SqlFunction(Name = "XML Record@InnerXml", IsDeterministic = true, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None)
   ]
   // RETURNS NULL ON NULL INPUT
   public static String XMLRecordInnerXml(SqlXml AXml, String ATag)
@@ -346,28 +341,112 @@ public partial class XmlRecords
     return null;
   }
 
+  private static void XMLRecordsCopyInternal(SqlXml AXml, String ATags, Boolean AIntersect, ref StringBuilder AResult)
+  {
+    String[] LTags = ATags.Split(new Char[] {';'}, StringSplitOptions.RemoveEmptyEntries);
+    if(AResult == null)
+      AResult = new StringBuilder();
+
+    XmlReader LReader = AXml.CreateReader();
+    LReader.Read();
+    while(!LReader.EOF)
+    {
+      if(LReader.NodeType == XmlNodeType.Element) 
+      {
+        if (LTags.Contains(LReader.Name) == AIntersect)
+          AResult.Append(LReader.ReadOuterXml());
+        else if (!LReader.IsEmptyElement)
+          LReader.Skip();
+        else
+          LReader.Read();
+      }
+      else
+        LReader.Read();
+    }
+  }
+
   [
-    SqlFunction
-    (
-      Name              = "XML Records::Copy", 
-      DataAccess        = DataAccessKind.None, 
-      SystemDataAccess  = SystemDataAccessKind.None, 
-      IsDeterministic   = true
-    )
+    SqlFunction(Name = "XML Records@Copy", IsDeterministic = true, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None)
   ]
   // RETURNS NULL ON NULL INPUT
   public static String XMLRecordsCopy(SqlXml AXml, String ATags)
   {
+    StringBuilder LResult = null;
+    XMLRecordsCopyInternal(AXml, ATags, true, ref LResult);
+    return LResult.Length > 0 ? LResult.ToString() : null;
+  }
+
+  [
+    SqlFunction(Name = "XML Records@Delete", IsDeterministic = true, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None)
+  ]
+  public static String XMLRecordsDelete(SqlXml AXml, String ATags)
+  {
+    if(AXml.IsNull)
+      return null;
+    if(String.IsNullOrEmpty(ATags))
+      return AXml.Value;
+
+    StringBuilder LResult = null;
+    XMLRecordsCopyInternal(AXml, ATags, false, ref LResult);
+    return LResult.Length > 0 ? LResult.ToString() : null;
+  }
+
+  [
+    SqlFunction(Name = "XML Records@Write", IsDeterministic = true, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None)
+  ]
+  public static String XMLRecordsWrite(SqlXml AXml, SqlXml AReplacement, String ATags)
+  {
+    if(String.IsNullOrEmpty(ATags))
+      return AXml.Value;
+
+    StringBuilder LResult = null;
+
+    if(!AXml.IsNull)
+      XMLRecordsCopyInternal(AXml, ATags, false, ref LResult);
+
+    if(!AReplacement.IsNull)
+      XMLRecordsCopyInternal(AReplacement, ATags, true, ref LResult);
+
+    return (LResult != null && LResult.Length > 0) ? LResult.ToString() : null;
+  }
+
+  [
+    SqlFunction(Name = "XML Records@Replace", IsDeterministic = true, DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None)
+  ]
+  public static String XMLRecordsReplace(SqlXml AXml, SqlXml AReplacement)
+  {
+    if(AXml.IsNull && AReplacement.IsNull)
+      return null;
+    if(AReplacement.IsNull)
+      return AXml.Value;
+    if(AXml.IsNull)
+      return AReplacement.Value;
+
+    List<String> LTags = new List<String>();
     StringBuilder LResult = new StringBuilder();
 
-    ATags = ';' + ATags + ';';
-    XmlReader LReader = AXml.CreateReader();
+    XmlReader LReader = AReplacement.CreateReader();
     LReader.Read();
     while(!LReader.EOF)
     {
       if(LReader.NodeType == XmlNodeType.Element)
       {
-        if (ATags.IndexOf(';' + LReader.Name + ';') >= 0)
+        LTags.Add(LReader.Name);
+        LResult.Append(LReader.ReadOuterXml());
+      }
+      else
+        LReader.Read();
+    }
+
+    LReader.Close();
+    LReader = AXml.CreateReader();
+
+    LReader.Read();
+    while(!LReader.EOF)
+    {
+      if(LReader.NodeType == XmlNodeType.Element)
+      {
+        if (!LTags.Contains(LReader.Name))
           LResult.Append(LReader.ReadOuterXml());
         else if (!LReader.IsEmptyElement)
           LReader.Skip();
