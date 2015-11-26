@@ -127,7 +127,7 @@ namespace UDT
 
 
     /// <summary>
-    /// Преобразует строку в данные
+    /// Конструктор (преобразует SQL-Строку в данные)
     /// </summary>
     [
      System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Src"),
@@ -138,6 +138,14 @@ namespace UDT
       if (Src.IsNull) return null;
       TParams LResult = TParams.New();
       LResult.FromString(Src.Value);
+      return LResult;
+    }
+
+    public static TParams ParseString(String Src)
+    {
+      if (Src == null) return null;
+      TParams LResult = TParams.New();
+      LResult.FromString(Src);
       return LResult;
     }
 

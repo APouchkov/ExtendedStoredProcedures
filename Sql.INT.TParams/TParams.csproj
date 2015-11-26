@@ -77,7 +77,8 @@
     <Reference Include="UDF.Pubs.Formats">
       <HintPath>..\Sql.UDF.Pubs.Formats\bin\Release\UDF.Pubs.Formats.dll</HintPath>
     </Reference>
-    <Reference Include="UDF.Pubs.Strings">
+    <Reference Include="UDF.Pubs.Strings, Version=1.0.5771.29569, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
     </Reference>
     <Reference Include="UDT.TList">

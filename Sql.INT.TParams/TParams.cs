@@ -20,7 +20,9 @@ namespace INT
   [Serializable]
   public class TParams : IBinarySerialize, IXmlSerializable
   {
-    private const String ListSeparator = ";";
+    private const Char ListSeparator      = ';';
+    //private static readonly Char[] ListSeparators  = new Char[3] { ';', '\r', '\n' };
+
     protected const String Const_ContextConnection = "context connection=true";
 
     /// <summary>
@@ -98,10 +100,11 @@ namespace INT
         if (LDataPair.Key[0] != '=')
         {
           SqlDbType type = Sql.GetSqlType(LDataPair.Value);
+          if(w.Length > 0)
+            w.Append(ListSeparator);
+
           w.Append
           (
-            (w.Length == 0 ? "" : ListSeparator)
-            +
             String.Format
             (
               "{0}{1}={2}", 
@@ -169,10 +172,11 @@ namespace INT
         Object LValue;
         if (!FData.TryGetValue(LName, out LValue)) continue;
         SqlDbType type = Sql.GetSqlType(LValue);
+        if(w.Length > 0)
+          w.Append(ListSeparator);
+
         w.Append
         (
-          (w.Length == 0 ? "" : ListSeparator)
-          +
           String.Format
           (
             "{0}{1}={2}", 
@@ -207,24 +211,73 @@ namespace INT
       Clear();
       if (String.IsNullOrEmpty(s)) return;
 
+      Pub.NamedItemsParser Parser =
+        new Pub.NamedItemsParser
+            (
+              s,
+              new Char[] {ListSeparator, '\r', '\n' },
+              true
+             );
+
+      while (Parser.MoveNext())
+      {
+        try
+        {
+          // Парсим значение
+          SqlDbType LSqlDbType = Sql.TypeFromString(Parser.Current.CastAs);
+          //if (Sql.IsQuoteType(LSqlDbType))
+          //  SValue = Strings.UnQuote(SValue, new Char[] { '"' });
+
+          Object LValue;
+          if (LSqlDbType == SqlDbType.Udt)
+            LValue = new SqlUdt(Parser.Current.CastAs, Parser.Current.Value);
+          else
+            LValue = Sql.ValueFromString(Parser.Current.Value, LSqlDbType, Sql.ValueDbStyle.SQL);
+
+          AddParam(DecodeName(Parser.Current.Name), LValue);
+        }
+        catch (Exception E)
+        {
+          throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", s, E.Message));
+        }
+      }
+    }
+/*
+    public void FromString(String s)
+    {
+      Clear();
+      if (String.IsNullOrEmpty(s)) return;
+
       s += ListSeparator;
 
       String LName = "";
-      String LType = "";
-      Int32 startName = 0;
-      Int32 startType = 0;
+      String LType = null;
+
+      Int32 startName  = 0;
+      Int32 startType  = 0;
       Int32 startValue = 0;
-      Boolean skip = false;
+
+      Boolean skip = false; // Если следующий символ <]> не в VALUE или <"> в VALUE
       Boolean next = false;
-      Char? quotedChar = null;
+
+      Char LQuoteChar = '\0';
 
       for (Int32 i = 0; i < s.Length; i++)
       {
         if (skip) { skip = false; continue; };
-        if (quotedChar != null && s[i] != quotedChar) continue;
 
-        if (s.Length < i + ListSeparator.Length || s.Substring(i, ListSeparator.Length) != ListSeparator)
-          switch (s[i])
+        Char LCurrChar = s[i];
+        if (LQuoteChar != '\0')
+        {
+          if(LCurrChar != LQuoteChar) continue;
+          if(i < s.Length - 1 && s[i + 1] == LQuoteChar)
+          {
+
+          }
+        }
+
+        if (LCurrChar != '\r' && LCurrChar != '\n' && LCurrChar != ListSeparator)
+          switch (LCurrChar)
           {
             case ':':
               if (startValue == 0 && startType == 0)
@@ -253,8 +306,10 @@ namespace INT
             case '[':
               if (startValue == 0)
               {
-                if (quotedChar == null) quotedChar = ']';
-                else quotedChar = null;
+                if (LQuoteChar == '\0')
+                  LQuoteChar = ']';
+                else
+                  LQuoteChar = '\0';
               }
               next = true;
               break;
@@ -262,8 +317,10 @@ namespace INT
             case ']':
               if (startValue == 0)
               {
-                if (i < s.Length - 1 && s[i + 1] == ']') skip = true;
-                else quotedChar = null;
+                if (i < s.Length - 1 && s[i + 1] == ']')
+                  skip = true;
+                else
+                  LQuoteChar = '\0';
               }
               next = true;
               break;
@@ -271,53 +328,62 @@ namespace INT
             case '"':
               if (startValue != 0)
               {
-                if (quotedChar == null) quotedChar = '"';
-                else if (i < s.Length - 1 && s[i + 1] == '"') skip = true;
-                else quotedChar = null;
+                if (LQuoteChar == '\0')
+                  LQuoteChar = '"';
+                else if (i < s.Length - 1 && s[i + 1] == '"')
+                  skip = true;
+                else
+                  LQuoteChar = '\0';
               }
               next = true;
               break;
 
-            default: next = true;
+            default:
+              next = true;
               break;
           }
 
         if (next)
           next = false;
-        else
-          if (startValue > 0)
-            try
-            {
-              // Парсим значение
-              String  SValue = s.Substring(startValue, i - startValue);
-              SqlDbType LSqlDbType = Sql.TypeFromString(LType);
-              if (Sql.IsQuoteType(LSqlDbType)) SValue = Strings.UnQuote(SValue, new Char[] {'"'});
+        else if (startValue > 0)
+        {
+          try
+          {
+            // Парсим значение
+            String SValue = s.Substring(startValue, i - startValue);
+            SqlDbType LSqlDbType = Sql.TypeFromString(LType);
+            if (Sql.IsQuoteType(LSqlDbType))
+              SValue = Strings.UnQuote(SValue, new Char[] { '"' });
 
-              Object LValue;
-              if(LSqlDbType == SqlDbType.Udt)
-                LValue = new SqlUdt(LType, SValue);
-              else
-                LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
+            Object LValue;
+            if (LSqlDbType == SqlDbType.Udt)
+              LValue = new SqlUdt(LType, SValue);
+            else
+              LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
 
-              // Добавляем параметр
-              AddParam(DecodeName(LName), LValue);
-              LName = "";
-              LType = "";
-              startName = i + 1;
-              startType = 0;
-              startValue = 0;
-            }
-            catch (Exception E)
-            {
-              throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", s, E.Message));
-            }
-          else
-            if (quotedChar == null && s.Substring(startName).Trim() != "")
-              throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует значение", s));
+            // Добавляем параметр
+            AddParam(DecodeName(LName), LValue);
+
+            LName = "";
+            LType = null;
+
+            startName   = i + 1;
+            startType   = 0;
+            startValue  = 0;
+          }
+          catch (Exception E)
+          {
+            throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", s, E.Message));
+          }
+        }
+        else if (LQuoteChar == '\0' && s.Substring(startName).Trim() != "")
+          throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует значение", s));
       }
-      if (quotedChar != null)
-        throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует '{1}'", s, quotedChar));
+
+      if (LQuoteChar != '\0')
+        throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует '{1}'", s, LQuoteChar));
     }
+*/
 
     /// <summary>
     /// Проверяет имя параметра на корректность
@@ -1570,7 +1636,7 @@ namespace INT
              );
 
       while (Parser.MoveNext() && !String.IsNullOrEmpty(Parser.Current.Value))
-        if (LSqlCommand.Parameters.IndexOf(Parser.Current.Value) == -1)
+        if (LSqlCommand.Parameters.IndexOf('@' + Parser.Current.Value) == -1)
         {
           Object LValue; 
           if (AParams != null && AParams.FData.TryGetValue(Parser.Current.Value, out LValue))

@@ -587,8 +587,10 @@ public class Sql
 
       FPosition = -1;
       FLength = FString.Length;
+
       MoveToNextChar();
-      FCurrent.Gap = "";
+
+      FCurrent.Gap   = "";
       FCurrent.Quote = (Char)0;
       FCurrent.Value = "";
     }

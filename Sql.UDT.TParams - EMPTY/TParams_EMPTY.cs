@@ -2225,7 +2225,7 @@ namespace UDT_EMPTY
         ]
         public Boolean Crossing(TParams_EMPTY value)
         {
-          return base.Crossing(value);
+          return false;
         }
 
         /// <summary>
@@ -2234,7 +2234,7 @@ namespace UDT_EMPTY
 				[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"), SqlMethod(Name = "CrossParams", IsMutator = false, OnNullCall = false)]
         public TParams_EMPTY CrossParams(TParams_EMPTY value)
         {
-          return (TParams_EMPTY)base.CrossParams(value);
+          return null;
         }
 
         /// <summary>
@@ -2243,14 +2243,12 @@ namespace UDT_EMPTY
 				[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"), SqlMethod(Name = "MergeParams", IsMutator = true, OnNullCall = true)]
         public TParams_EMPTY MergeParams(TParams_EMPTY value)
         {
-          base.MergeParams(value);
-          return this;
+          return null;
         }
 				[System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Design", "CA1011:ConsiderPassingBaseTypesAsParameters"), SqlMethod(Name = "Merge", IsMutator = false, OnNullCall = true)]
-        public TParams_EMPTY Merge(TParams_EMPTY value)
+        public static TParams_EMPTY Merge(TParams_EMPTY Value1, TParams_EMPTY Value2)
         {
-          base.MergeParams(value);
-          return this;
+          return null;
         }
 
         /// <summary>
@@ -2275,7 +2273,7 @@ namespace UDT_EMPTY
         ]
         public bool Equals(TParams_EMPTY args)
         {
-          return base.Equals(args);
+          return false;
         }
 
 				[SqlMethod(Name = "Equal", OnNullCall = true)]
@@ -2290,7 +2288,7 @@ namespace UDT_EMPTY
         [SqlMethod(Name = "AsVariant", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
         public new Object AsVariant(SqlString name)
         {
-            return base.AsVariant(name);
+            return null;
         }
 
         /// <summary>
@@ -2299,7 +2297,7 @@ namespace UDT_EMPTY
         [SqlMethod(Name = "AsBit", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
         public new SqlBoolean AsBit(SqlString name)
         {
-            return base.AsBit(name);
+            return false;
         }
 
         /// <summary>
@@ -2313,7 +2311,7 @@ namespace UDT_EMPTY
         [SqlMethod(Name = "AsNVarChar", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
         public new SqlString AsNVarChar(SqlString name)
         {
-            return base.AsNVarChar(name);
+            return SqlString.Null;
         }
 
         /// <summary>
@@ -2322,7 +2320,7 @@ namespace UDT_EMPTY
         [SqlMethod(Name = "AsSQLString", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
         public SqlString AsSQLString(String Name)
         {
-          return base.AsNVarChar(Name);
+          return SqlString.Null;
         }
 
         /// <summary>

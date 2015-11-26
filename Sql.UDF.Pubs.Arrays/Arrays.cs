@@ -494,6 +494,24 @@ public class Arrays
       return null;
   }
 
+  [SqlFunction(Name = "ArraysJoin2", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String ArraysJoin2(String AAll, String ACustom, Char ASeparator)
+  {
+    if (String.IsNullOrEmpty(AAll) || String.IsNullOrEmpty(ACustom)
+        ||
+        AAll.Equals(ASeparator) || ACustom.Equals(ASeparator)
+       )
+      return null;
+
+    if (AAll.Equals("*"))
+      throw new Exception("Первый параметр (@All) не может быть бесконечным множеством (*)");
+
+    if (ACustom.Equals("*"))
+      return "*";
+
+    return ArraysJoin(AAll, ACustom, ASeparator);
+  }
 
   public static Int64 ArrayTestInternal(String AArray1, String AArray2, String ASeparator)
   {
