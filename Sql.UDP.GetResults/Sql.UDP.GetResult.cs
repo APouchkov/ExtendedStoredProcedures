@@ -59,7 +59,7 @@ public static class DynamicSQL
           Result.Append("NULL");
         else if(Parser.Current.Value[0] == '$')
         {
-          String LValues = (Parser.Current.Value.Length == 1 ? AParams.ToString() : AParams.ToStringEx(Parser.Current.Value.Substring(1)));
+          String LValues = (Parser.Current.Value.Length == 1 ? AParams.CastAsString() : AParams.CastAsStringCustom(Parser.Current.Value.Substring(1)));
           Result.Append(LValues == null ? "NULL" : Strings.QuoteString(LValues));
         }
         else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))

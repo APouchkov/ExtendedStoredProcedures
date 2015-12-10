@@ -191,11 +191,23 @@ public class Sql
 
   private static readonly String[] DateTimeFormats =
   { 
-    TextDateTimePattern, TextDatePattern, TextDateTimeOffsetPattern,
-    SQLDateTimePattern, SQLDatePattern, SQLDateTimeOffsetPattern,
-    "yy-MM-dd HH:mm:ss.FFFFFFF"  , "yy-MM-dd",
-    "yyMMdd HH:mm:ss.FFFFFFF"    , "yyMMdd",
-    XMLDateTimePattern, XMLDateTimeOffsetPattern, XMLDateTimeZeroOffsetPattern
+    SQLDatePattern  , SQLSmallDateTimePattern  , SQLDateTimePattern      , SQLDateTimeOffsetPattern  ,
+    XMLDatePattern  ,                            XMLDateTimePattern      , XMLDateTimeOffsetPattern  , XMLDateTimeZeroOffsetPattern,
+                      TextSmallDateTimePattern , TextDateTimePattern     , TextDateTimeOffsetPattern
+    //"yy-MM-dd HH:mm:ss.FFFFFFF"  , "yy-MM-dd",
+    //"yyMMdd HH:mm:ss.FFFFFFF"    , "yyMMdd",
+  };
+
+  private static readonly String[] SQLDateFormats =
+  { 
+    SQLDatePattern,
+    XMLDatePattern
+  };
+
+  private static readonly String[] SQLDateTimeFormats =
+  { 
+    SQLDatePattern, SQLSmallDateTimePattern , SQLDateTimePattern, SQLDateTimeOffsetPattern,
+    XMLDatePattern,                           XMLDateTimePattern, XMLDateTimeOffsetPattern, XMLDateTimeZeroOffsetPattern
   };
 
   public static bool IsQuoteType(SqlDbType type)
@@ -456,7 +468,7 @@ public class Sql
                                             XmlConvert.ToDateTime(value, XmlDateTimeSerializationMode.RoundtripKind).Date
                                             :
                                             (style == ValueDbStyle.SQL)?
-                                              DateTime.ParseExact(value, SQLDatePattern, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).Date
+                                              DateTime.ParseExact(value, SQLDateFormats, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).Date
                                               :
                                               DateTime.ParseExact(value, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind).Date;
           case SqlDbType.SmallDateTime  : 
@@ -468,7 +480,7 @@ public class Sql
                                               XmlConvert.ToDateTime(value, XmlDateTimeSerializationMode.RoundtripKind)
                                               :
                                               (style == ValueDbStyle.SQL)?
-                                              DateTime.ParseExact(value, SQLDateTimePattern, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
+                                              DateTime.ParseExact(value, SQLDateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
                                               :
                                               DateTime.ParseExact(value, DateTimeFormats, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
                                           );

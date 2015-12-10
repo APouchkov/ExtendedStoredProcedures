@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Data.SqlTypes;
 using System.Text;
+using System.Linq;
 
 public enum TLoadValueCondition { lvcIfNotPresent = 1 /* E */, lvcIfReceive = 2 /* R */, lvcAlways = 3 /* A */};
 
@@ -47,6 +48,7 @@ public partial class Pub
     public int     Index;
     public String  Name;
     public String  CastAs;
+    public Char    Quote;
     public String  Value;
     public Boolean Eof;
   }
@@ -77,21 +79,21 @@ public partial class Pub
 
       FWithCastAs = AWithCastAs;
 
-      FPosition = 0;
-      FCurrent.Index = -1;
-      FCurrent.Name = null;
+      FPosition       = 0;
+      FCurrent.Index  = -1;
+      FCurrent.Name   = null;
       FCurrent.CastAs = null;
-      FCurrent.Value = null;
-      FCurrent.Eof = String.IsNullOrEmpty(FString);
-
-      // FLength = FString.Length;
-      //MoveToNextChar();
+      FCurrent.Value  = null;
+      FCurrent.Eof    = String.IsNullOrEmpty(FString);
     }
 
     private static readonly Char[] FQuotes = new Char[4] { '"', '[', '\'', '{' };
     private const String SError_InvalidString = "Invalid named variables string: ";
     public Boolean MoveNext()
     {
+      while (!FCurrent.Eof && FDelimiters.Contains(FString[FPosition]))
+        FCurrent.Eof = (++FPosition == FString.Length);
+
       if (FCurrent.Eof)
         return false;
 
@@ -103,8 +105,10 @@ public partial class Pub
         int LEQPosition = FString.IndexOf('=', FPosition);
         if (LEQPosition == -1 || LEQPosition == FPosition)
           throw new Exception(SError_InvalidString + FString);
+
         FCurrent.Name = FString.Substring(FPosition, LEQPosition - FPosition);
         FPosition = LEQPosition + 1;
+
         if (FWithCastAs)
         { 
           int LCastAsPosition = FCurrent.Name.LastIndexOf(':');
@@ -124,6 +128,7 @@ public partial class Pub
           LNextChars = new char[2] { ':', '=' };
         else
           LNextChars = new char[1] { '=' };
+
         FPosition++;
         if(!Sql.InternalParseEOQ(LQuote, FString, ref FPosition, out FCurrent.Name, LNextChars))
           throw new Exception(SError_InvalidString + FString);
@@ -144,11 +149,11 @@ public partial class Pub
       }
 
       if (FPosition < FString.Length)
-        LQuote = Strings.InternalGetRightQuote(FString[FPosition], FQuotes);
+        FCurrent.Quote = Strings.InternalGetRightQuote(FString[FPosition], FQuotes);
       else
-        LQuote = '\0';
+        FCurrent.Quote = '\0';
 
-      if (LQuote == '\0')
+      if (FCurrent.Quote == '\0')
       {
         int LDelimiterPosition = FString.IndexOfAny(FDelimiters, FPosition);
         if (LDelimiterPosition == -1)
@@ -162,7 +167,7 @@ public partial class Pub
       else
       {
         FPosition++;
-        if(!Sql.InternalParseEOQ(LQuote, FString, ref FPosition, out FCurrent.Value, FDelimitersEx))
+        if(!Sql.InternalParseEOQ(FCurrent.Quote, FString, ref FPosition, out FCurrent.Value, FDelimitersEx))
           throw new Exception(SError_InvalidString + FString);
         FPosition++;
         FCurrent.Eof = (FPosition >= FString.Length);

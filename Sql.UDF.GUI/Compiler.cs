@@ -29,8 +29,9 @@ public class ScriptParser
 {
   private const String ContextConnection = "context connection=true";
 
-  private static readonly Char[] Returns = new Char[2] {'\r', '\n'};
-  private static readonly Char[] Spaces  = new Char[3] {' ', '\r', '\n'};
+  private static readonly Char[] Returns    = new Char[2] {'\r', '\n'};
+  private static readonly Char[] Spaces     = new Char[2] {' ', '\t'};
+  private static readonly Char[] AllSpaces  = new Char[4] {' ', '\t', '\r', '\n'};
 
   private TParsingText  FInput;
 
@@ -191,12 +192,12 @@ public class ScriptParser
           int LLength = FCommand.Length;
           //Char[] LSpaces = new Char[3];
 
-          for(; LIndex < LLength && !Spaces.Contains(FCommand[LIndex]); LIndex++);
+          for(; LIndex < LLength && !AllSpaces.Contains(FCommand[LIndex]); LIndex++);
           
 
           if(LIndex < LLength)
           {
-            FValue   = FCommand.Substring(LIndex + 1);
+            FValue   = FCommand.Substring(LIndex + 1).Trim(Spaces);
             FCommand = FCommand.Substring(0, LIndex);
           }
           else
@@ -381,14 +382,14 @@ public class ScriptParser
     }
   }
 
-  private Boolean InternalCallIF(ref TParsingText AInput, UDT.TParams AParams)
+  private Boolean InternalCallIF(String ACommand, String AValue, UDT.TParams AParams, ref TParsingText AInput)
   {
     if(AInput.Bol) AInput.InternalSkipReturns();
 
-    if(AInput.Command == "IF")
-      return INT.TParams.EvaluateBoolean(AParams, AInput.Value, false);
+    if(ACommand == "IF")
+      return INT.TParams.EvaluateBoolean(AParams, AValue, false);
     else
-      return (AParams.Exists(AInput.Value) == (AInput.Command == "IFDEF"));
+      return (AParams.Exists(AValue) == (ACommand == "IFDEF"));
   }
 
   private void InitSqlCommandOther()
@@ -422,8 +423,12 @@ ref TParsingText          AInput,
     StringBuilder         AText           = null
   )
   {
-    Boolean LSkipText = ASkipText;
-    Boolean LElseIfCompleted = (AWaitFor != TScriptParserWaitFor.None && !ASkipText && !AParentSkipText);
+    // Пропуск хода
+    Boolean LSkipText = AParentSkipText || ASkipText;
+    // Если при входе определяется блок IF(Else) и нет пропусков, то, наверное, это удачный вход "IF".
+    // А значит ElseIf считаем завершённым
+    Boolean LElseIfCompleted = ((AWaitFor & TScriptParserWaitFor.Else) == TScriptParserWaitFor.Else && !ASkipText && !AParentSkipText);
+
     if(AText == null)
       AText = FOutput;
 
@@ -432,28 +437,28 @@ ref TParsingText          AInput,
       if(!LSkipText) AText.Append(AInput.Gap);
 
       if(!String.IsNullOrEmpty(AInput.Command))
-      { 
+      {
         //SqlContext.Pipe.Send("Command: " + FCommand + ", FValue = " + FValue + ", AWaitFor = " + AWaitFor.ToString() + ", LSkipText = " + LSkipText.ToString() + ", LElseIfCompleted = " + LElseIfCompleted.ToString());
 
-        if(AInput.Command == "IF" || AInput.Command == "IFDEF" || AInput.Command == "IFNDEF")
+        if (AInput.Command == "IF" || AInput.Command == "IFDEF" || AInput.Command == "IFNDEF")
         {
-          Boolean LIfTrue = InternalCallIF(ref AInput, AParams);
+          Boolean LIfTrue = (!LSkipText) && InternalCallIF(ACommand: AInput.Command, AValue: AInput.Value, AParams: AParams, AInput: ref AInput);
 
           CallIF
           (
             AInput          : ref AInput,
             AParams         : AParams,
             AWaitFor        : TScriptParserWaitFor.Else | TScriptParserWaitFor.End | TScriptParserWaitFor.EndIf,
-            ASkipText       : LSkipText || (!LIfTrue),
-            AParentSkipText : ASkipText
+            ASkipText       : !LIfTrue,
+            AParentSkipText : AParentSkipText || LSkipText
           );
 
           // SqlContext.Pipe.Send("IF: LElseFound = " + LElseFound.ToString());
         }
 
-        else if(AInput.Command == "FOREACH")
+        else if (AInput.Command == "FOREACH")
         {
-          TParsingPosition LPosition  = AInput.Position;
+          TParsingPosition LPosition = AInput.Position;
 
           InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(AInput.Value, AParams);
@@ -463,76 +468,77 @@ ref TParsingText          AInput,
           try { LDataTable = GetDataTable(FSqlCommandOther); }
           catch (Exception E) { AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
 
-          foreach(DataRow LDataRow in LDataTable.Rows)
+          foreach (DataRow LDataRow in LDataTable.Rows)
           {
             AInput.Position = LPosition;
-            foreach(DataColumn LColumn in LDataTable.Columns)
+            foreach (DataColumn LColumn in LDataTable.Columns)
               AParams.AddParam(LColumn.ColumnName, LDataRow[LColumn]);
+
             CallIF
             (
-              AInput    : ref AInput,
-              AParams   : AParams,
-              AWaitFor  : TScriptParserWaitFor.End
+              AInput: ref AInput,
+              AParams: AParams,
+              AWaitFor: TScriptParserWaitFor.End
             );
           }
-          foreach(DataColumn LColumn in LDataTable.Columns)
+          foreach (DataColumn LColumn in LDataTable.Columns)
             AParams.DeleteParam(LColumn.ColumnName);
 
           LDataTable.Clear();
         }
 
-        else if(AInput.Command == "END" || AInput.Command == "ENDIF" || AInput.Command == "IFEND")
+        else if (AInput.Command == "END" || AInput.Command == "ENDIF" || AInput.Command == "IFEND")
         {
-          if(AInput.Bol) AInput.InternalSkipReturns();
+          if (AInput.Bol) AInput.InternalSkipReturns();
 
           TScriptParserWaitFor LCommand = AInput.Command == "END" ? TScriptParserWaitFor.End : TScriptParserWaitFor.EndIf;
-          if((AWaitFor & LCommand) == 0)
+          if ((AWaitFor & LCommand) == 0)
             AInput.Exception("Найден инструкция конца блока {$" + AInput.Command + "} без предшествующей ей инструкции открытия блока");
 
           return;
         }
 
-        else if(AInput.Command == "ELSE")
+        else if (AInput.Command == "ELSE")
         {
-          if(AInput.Bol) AInput.InternalSkipReturns();
+          if (AInput.Bol) AInput.InternalSkipReturns();
 
-          if((AWaitFor & TScriptParserWaitFor.Else) == 0)
+          if ((AWaitFor & TScriptParserWaitFor.Else) == 0)
             AInput.Exception("Найдена инструкция {$ELSE} без предшествующей ей инструкции {$IF}");
-  
-          if(AInput.Value.Length > 0)
+
+          if (AInput.Value.Length > 0)
           {
-            int LSpace = AInput.Value.IndexOfAny(Spaces); 
+            int LSpace = AInput.Value.IndexOfAny(AllSpaces);
             String LCommand;
             String LValue;
-            if(LSpace > 0)
+            if (LSpace > 0)
             {
               LCommand = AInput.Value.Substring(0, LSpace);
-              LValue   = AInput.Value.Substring(LSpace + 1);
+              LValue = AInput.Value.Substring(LSpace + 1);
             }
             else
             {
               LCommand = AInput.Value;
-              LValue   = "";
+              LValue = "";
             }
 
-            if(!LElseIfCompleted && !AParentSkipText)
-            { 
-              if(LCommand == "IF" || LCommand == "IFDEF" || LCommand == "IFNDEF")
+            if (!LElseIfCompleted && !AParentSkipText)
+            {
+              if (LCommand == "IF" || LCommand == "IFDEF" || LCommand == "IFNDEF")
               {
-                LElseIfCompleted = InternalCallIF(ref AInput, AParams);
-                if(LElseIfCompleted)
+                LElseIfCompleted = InternalCallIF(ACommand: LCommand, AValue: LValue, AParams: AParams, AInput: ref AInput);
+                if (LElseIfCompleted)
                   LSkipText = false;
               }
               else
                 AInput.Exception("Неизвестная инструкция {$ELSE " + LCommand + '}');
             }
-            else if(LElseIfCompleted && !LSkipText)
-            { 
+            else if (LElseIfCompleted && !LSkipText)
+            {
               LSkipText = true;
             }
           }
           else
-          { 
+          {
             AWaitFor ^= TScriptParserWaitFor.Else;
             LSkipText = LElseIfCompleted || AParentSkipText;
           }
@@ -540,28 +546,28 @@ ref TParsingText          AInput,
           continue;
         }
 
-        else if(AInput.Command == "I" || AInput.Command == "INCLUDE")
+        else if (AInput.Command == "I" || AInput.Command == "INCLUDE")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           byte LDepth;
           String LStringFValue = AInput.Value.Trim();
           InternalDeepQuoteLevel(ref LStringFValue, out LDepth);
 
-          SqlString LValue = INT.TParams.AsNVarChar(AParams, LStringFValue);
-          if(!LValue.IsNull)
+          SqlString LValue = INT.TParams.AsSqlString(AParams, LStringFValue);
+          if (!LValue.IsNull)
             AText.Append(AInput.InternalDeepQuote(LValue.Value, LDepth));
         }
 
-        else if(FTranslateScalar != null && (AInput.Command == "T" || AInput.Command == "TRANSLATE"))
+        else if (FTranslateScalar != null && (AInput.Command == "T" || AInput.Command == "TRANSLATE"))
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           byte LDepth;
           String LStringFValue = AInput.Value.Trim();
           InternalDeepQuoteLevel(ref LStringFValue, out LDepth);
 
-          if(FSqlCommandTranslateScalar == null)
+          if (FSqlCommandTranslateScalar == null)
           {
             FSqlCommandTranslateScalar = FSqlConnection.CreateCommand();
             FSqlCommandTranslateScalar.CommandType = CommandType.Text;
@@ -574,9 +580,9 @@ ref TParsingText          AInput,
           AText.Append(AInput.InternalDeepQuote(LValue.ToString(), LDepth));
         }
 
-        else if(AInput.Command == "SELECT" || AInput.Command == "EXEC")
+        else if (AInput.Command == "SELECT" || AInput.Command == "EXEC")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           byte LDepth;
           String LStringFValue = AInput.Value;
@@ -586,20 +592,20 @@ ref TParsingText          AInput,
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(AInput.Command + ' ' + LStringFValue, AParams);
 
           try
-          { 
+          {
             Object LValue = FSqlCommandOther.ExecuteScalar();
-            if(LValue != null && LValue != DBNull.Value)
+            if (LValue != null && LValue != DBNull.Value)
               AText.Append(AInput.InternalDeepQuote(Convert.ToString(LValue), LDepth));
           }
-          catch(Exception E)
+          catch (Exception E)
           {
             AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message);
           }
         }
 
-        else if(AInput.Command == "IMPORT")
+        else if (AInput.Command == "IMPORT")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(AInput.Value, AParams);
@@ -607,9 +613,9 @@ ref TParsingText          AInput,
           SqlDataReader LReader = null;
 
           try { LReader = FSqlCommandOther.ExecuteReader(); }
-          catch(Exception E) { AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
+          catch (Exception E) { AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
 
-          if (!LReader.IsClosed)
+          while (!LReader.IsClosed)
           {
             if (LReader.Read())
             {
@@ -619,13 +625,13 @@ ref TParsingText          AInput,
               for (int i = LReader.FieldCount - 1; i >= 0; i--)
                 AParams.AddParam(LReader.GetName(i), LValues[i]);
             }
-            LReader.Close();
+            if (!LReader.NextResult()) { LReader.Close(); break; }
           }
         }
 
-        else if(AInput.Command == "DEFINE")
+        else if (AInput.Command == "DEFINE")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(AInput.Value, AParams);
@@ -633,7 +639,7 @@ ref TParsingText          AInput,
           SqlDataReader LReader = null;
 
           try { LReader = FSqlCommandOther.ExecuteReader(); }
-          catch(Exception E) { AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
+          catch (Exception E) { AInput.Exception("Ошибка исполнения запроса {" + FSqlCommandOther.CommandText + "}: " + E.Message); }
 
           if (!LReader.IsClosed)
           {
@@ -647,16 +653,16 @@ ref TParsingText          AInput,
           }
         }
 
-        else if(AInput.Command == "SET" || AInput.Command == "APPEND")
+        else if (AInput.Command == "SET" || AInput.Command == "APPEND")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           int LEqual = AInput.Value.IndexOf('=');
           if (LEqual < 0)
           {
             //Exception("Пропущен символ присвоения '=': " + FCommand + ' ' + FValue);
-            Boolean LSet  = (AInput.Command == "SET");
-            String  LName = AInput.Value;
+            Boolean LSet = (AInput.Command == "SET");
+            String LName = AInput.Value;
 
             StringBuilder LText = new StringBuilder();
             CallIF
@@ -670,49 +676,58 @@ ref TParsingText          AInput,
               AParams.AddParam(LName, new SqlString(LText.ToString()));
             else
             {
-              SqlString FOldValue = AParams.AsSQLString(LName);
+              SqlString FOldValue = AParams.AsNVarChar(LName);
               if (FOldValue.IsNull)
-                AParams.AddParam(LName, new SqlString(LText.ToString()));
+                AParams.AddParam(LName, new SqlChars(LText.ToString()));
               else
-                AParams.AddParam(LName, new SqlString(FOldValue.Value + LText.ToString()));
+                AParams.AddParam(LName, new SqlChars(FOldValue.Value + LText.ToString()));
             }
           }
           else
           {
-            String LName = AInput.Value.Substring(0, LEqual).Trim();
+            String LName = AInput.Value.Substring(0, LEqual).TrimEnd();
             if (LName.Length == 0)
               AInput.Exception("Имя макроса должно быть непустым: " + AInput.Command + ' ' + AInput.Value);
 
-            String LValue = AInput.Value.Substring(LEqual + 1, AInput.Value.Length - LEqual - 1);
+            String LValue = AInput.Value.Substring(LEqual + 1, AInput.Value.Length - LEqual - 1).TrimStart(Spaces);
             if (AInput.Command == "SET")
               AParams.AddParam(LName, new SqlString(LValue));
             else
             {
-              SqlString FOldValue = AParams.AsSQLString(LName);
+              SqlString FOldValue = AParams.AsNVarChar(LName);
               if (FOldValue.IsNull)
-                AParams.AddParam(LName, new SqlString(LValue));
+                AParams.AddParam(LName, new SqlChars(LValue));
               else
-                AParams.AddParam(LName, new SqlString(FOldValue.Value + LValue));
+                AParams.AddParam(LName, new SqlChars(FOldValue.Value + LValue));
             }
           }
-          
-          AInput.InternalSkipReturns();
-        }
-
-        else if(AInput.Command == "C" || AInput.Command == "COMMENT")
-        {
-          if(LSkipText) continue;
 
           AInput.InternalSkipReturns();
         }
 
-        else if(FUseScalar != null && (AInput.Command == "U" || AInput.Command == "USE"))
+        else if (AInput.Command == "CLEAR")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
+
+          AParams.DeleteParam(AInput.Value);
+
+          AInput.InternalSkipReturns();
+        }
+
+        else if (AInput.Command == "C" || AInput.Command == "COMMENT")
+        {
+          if (LSkipText) continue;
+
+          AInput.InternalSkipReturns();
+        }
+
+        else if (FUseScalar != null && (AInput.Command == "U" || AInput.Command == "USE"))
+        {
+          if (LSkipText) continue;
 
           String LStringFValue = AInput.Value.Trim();
 
-          if(FSqlCommandUseScalar == null)
+          if (FSqlCommandUseScalar == null)
           {
             FSqlCommandUseScalar = FSqlConnection.CreateCommand();
             FSqlCommandUseScalar.CommandType = CommandType.Text;
@@ -720,10 +735,10 @@ ref TParsingText          AInput,
             FSqlCommandUseScalar.Parameters.Add("@Unit", SqlDbType.NVarChar, 1000).Direction = ParameterDirection.Input;
           }
 
-          int LIndex = LStringFValue.IndexOfAny(Spaces);
+          int LIndex = LStringFValue.IndexOfAny(AllSpaces);
           FSqlCommandUseScalar.Parameters[0].Value = LIndex == -1 ? LStringFValue : LStringFValue.Substring(0, LIndex);
           Object LValue = FSqlCommandUseScalar.ExecuteScalar();
-          if(LValue != null && LValue != DBNull.Value)
+          if (LValue != null && LValue != DBNull.Value)
           {
             UDT.TParams LParams;
             // USE <UNIT> <EX>
@@ -731,24 +746,7 @@ ref TParsingText          AInput,
             {
               LParams = UDT.TParams.New();
               LParams.ContextConnection = FSqlConnection;
-
-              String LParamsString = LStringFValue.Substring(LIndex + 1).TrimStart();
-              String LConstantsString = null;
-              if (LStringFValue[LIndex] == ' ')
-              {
-                LIndex = LParamsString.IndexOfAny(Returns);
-                if (LIndex >= 0)
-                {
-                  LConstantsString = LParamsString.Substring(LIndex + 1).TrimStart();
-                  LParamsString = LParamsString.Substring(0, LIndex);
-                }
-                //SqlContext.Pipe.Send("LParamsString = " + LParamsString);
-                LParams.Load(AParams, LParamsString);
-              }
-              else
-                LConstantsString = LParamsString;
-
-              LParams.MergeParams(UDT.TParams.ParseString(LConstantsString));
+              LParams.LoadFromString(AString: LStringFValue.Substring(LIndex + 1).TrimStart(), ASeparator: ',', AParams: AParams, AParamPrefix: ':');
             }
             else
               LParams = AParams;
@@ -757,16 +755,16 @@ ref TParsingText          AInput,
             TParsingText LParsingText = new TParsingText(AText: LValue.ToString(), AComments: AInput.Comments, ALiteral: AInput.Literal);
             CallIF
             (
-              AInput  : ref LParsingText,
-              AParams : LParams
+              AInput: ref LParsingText,
+              AParams: LParams
             );
           }
 
           //AText.Append(AInput.InternalDeepQuote(LValue.ToString(), LDepth));
         }
-        else if(AInput.Command == "EXCEPTION")
+        else if (AInput.Command == "EXCEPTION")
         {
-          if(LSkipText) continue;
+          if (LSkipText) continue;
 
           AInput.Exception(String.IsNullOrWhiteSpace(AInput.Value) ? "Abstract error" : AInput.Value);
         }

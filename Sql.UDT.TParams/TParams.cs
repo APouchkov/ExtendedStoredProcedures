@@ -80,25 +80,25 @@ namespace UDT
     [SqlMethod(Name = "ToString", OnNullCall = false, IsDeterministic = true)]
     public override String ToString()
     {
-      return base.ToString();
+      return base.CastAsString();
     }
 
     /// <summary>
     /// Преобразует перечисленные параметры в строку
     /// </summary>
     [SqlMethod(Name = "ToStringEx", OnNullCall = false, IsDeterministic = true)]
-    public override String ToStringEx(String ANames)
+    public SqlChars ToStringEx(String ANames, String AListSeparator)
     {
-      return base.ToStringEx(ANames);
+      return new SqlChars(base.CastAsStringCustom(ANames, AListSeparator));
     }
 
     /// <summary>
     /// Преобразует данные в строку XML
     /// </summary>
     [SqlMethod(Name = "ToXMLString", OnNullCall = true, IsDeterministic = true)]
-    public new String ToXMLString(String AElement = null)
+    public new SqlChars ToXMLString(String AElement = null)
     {
-      return base.ToXMLString(AElement);
+      return new SqlChars(base.ToXMLString(AElement));
     }
 
     [System.Diagnostics.CodeAnalysis.SuppressMessage("Microsoft.Naming", "CA1709:IdentifiersShouldBeCasedCorrectly", MessageId = "Target")]
@@ -141,13 +141,13 @@ namespace UDT
       return LResult;
     }
 
-    public static TParams ParseString(String Src)
-    {
-      if (Src == null) return null;
-      TParams LResult = TParams.New();
-      LResult.FromString(Src);
-      return LResult;
-    }
+    //public static TParams ParseString(String Src)
+    //{
+    //  if (Src == null) return null;
+    //  TParams LResult = TParams.New();
+    //  LResult.FromString(Src);
+    //  return LResult;
+    //}
 
     /// <summary>
     /// Очищает список параметров
@@ -170,11 +170,11 @@ namespace UDT
     /// <summary>
     /// Возвращает наименование параметров строкой
     /// </summary>
-    public SqlString Names
+    public SqlChars Names
     {
       get
       {
-        return base.GetNames();
+        return new SqlChars(base.GetNames());
       }
     }
 
@@ -552,41 +552,36 @@ namespace UDT
     /// Возвращает значение параметра типа NVarChar
     /// </summary>
     [SqlMethod(Name = "AsNVarChar", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
-    public new SqlString AsNVarChar(String Name)
+    public SqlString AsNVarChar(String AName)
     {
-      return base.AsNVarChar(Name);
+      return base.AsSqlString(AName);
     }
 
     /// <summary>
-    /// Возвращает значение параметра типа VarChar (С 2008R2 только NVarChar)
+    /// Возвращает значение параметра типа NVarChar
     /// </summary>
-    //[SqlMethod(Name = "AsVarCharMax", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
-    //public new SqlBytes AsVarCharMax(String Name)
-    //{
-    //  return base.AsVarCharMax(Name);
-    //}
     [SqlMethod(Name = "AsNVarCharMax", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
-    public new SqlChars AsNVarCharMax(String Name)
+    public SqlChars AsNVarCharMax(String Name)
     {
-      return base.AsNVarCharMax(Name);
+      return base.AsSqlChars(Name);
     }
 
     /// <summary>
     /// Возвращает значение параметра в формате SQL
     /// </summary>
     [SqlMethod(Name = "AsSQLString", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
-    public new SqlString AsSQLString(String Name)
+    public new SqlChars AsSQLString(String Name)
     {
-      return base.AsSQLString(Name);
+      return new SqlChars(base.AsSQLString(Name));
     }
 
     /// <summary>
     /// Возвращает значение параметра типа VarChar
     /// </summary>
     [SqlMethod(Name = "AsSQLText", IsDeterministic = true, IsPrecise = true, OnNullCall = false)]
-    public new SqlString AsSQLText(String Name)
+    public new SqlChars AsSQLText(String Name)
     {
-      return base.AsSQLText(Name);
+      return new SqlChars(base.AsSQLText(Name));
     }
 
     /// <summary>
@@ -760,18 +755,24 @@ namespace UDT
       base.RegisterDependedParams(Value);
     }
 
+    //[SqlMethod(Name = "Format", IsMutator = false, IsDeterministic = true, OnNullCall = false)]
+    //public SqlChars Format(String AValue)
+    //{
+    //  return new SqlChars(INT.TParams.Format(this, AValue));
+    //}
+
     /// <summary>
     /// Форматирует строку
     /// </summary>
-    [SqlMethod(Name = "Format", IsMutator = false, IsDeterministic = true, OnNullCall = false)]
-    public SqlString Format(String AValue)
-    {
-      return INT.TParams.Format(this, AValue);
-    }
     [SqlFunction(Name = "Format", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-    public static SqlString InternalFormat(TParams AParams, String AValue)
+    public static String Format(String AFormat, TParams AParams)
     {
-      return INT.TParams.Format(AParams, AValue);
+      return INT.TParams.Format(AFormat, AParams);
+    }
+    [SqlFunction(Name = "FormatMax", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+    public static String FormatMax(String AFormat, TParams AParams)
+    {
+      return INT.TParams.Format(AFormat, AParams);
     }
 
     /// <summary>

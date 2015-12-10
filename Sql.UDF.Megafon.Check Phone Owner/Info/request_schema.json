@@ -1,0 +1,151 @@
+{
+  "$schema": "http://json-schema.org/draft-04/schema#",
+
+  "definitions": {
+
+    "data": {
+      "type": "object",
+      "properties": {
+        "msisdn": { "$ref": "#/definitions/msisdn" },
+        "variables": { "$ref": "#/definitions/variables" },
+        "attributes": { "$ref": "#/definitions/attributes" }
+      },
+      "required": ["msisdn", "variables"]
+    },
+
+    "msisdn": {
+      "type": "string",
+      "pattern": "^7([0-9]{10})$"
+    },
+
+    "variables": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/variable" }
+    },
+
+    "variable": {
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" }
+      },
+      "required": ["name"]
+    },
+
+    "attributes": {
+      "type": "array",
+      "items": { "$ref": "#/definitions/attribute" }
+    },
+
+    "attribute": {
+      "type": "object",
+      "properties": {
+        "name": { "$ref": "#/definitions/attribute_name" },
+        "value": { "$ref": "#/definitions/attribute_value" }
+      }
+    },
+
+    "attribute_name": {
+      "type": "string",
+      "enum": ["FULLNAME", "BIRTHDATE", "ADDRESSES", "DOCUMENTS"]
+    },
+
+    "attribute_value": {
+      "anyOf": [
+        { "$ref": "#/definitions/fullname" },
+        { "$ref": "#/definitions/birthdate" },
+        { "$ref": "#/definitions/addresses" },
+        { "$ref": "#/definitions/documents" }
+      ]
+    },
+
+    "fullname": {
+      "description": "schema for FULLNAME attribute",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "surname": { "type": "string" },
+        "patronymic": { "type": "string" }
+      }
+    },
+
+    "birthdate": {
+      "description": "schema for BIRTHDATE attribute",
+      "$ref": "#/definitions/date"
+    },
+
+    "addresses": {
+      "description": "schema for ADDRESSES attribute",
+      "type": "array",
+      "items": { "$ref": "#/definitions/address" }
+    },
+
+    "address": {
+      "type": "object",
+      "properties": {
+        "type":         { "$ref": "#/definitions/address_type" },
+        "region":       { "type": "string" },
+        "district":     { "type": "string" },
+        "districttype": { "type": "string" },
+        "city":         { "type": "string" },
+        "citytype":     { "type": "string" },
+        "locality":     { "type": "string" },
+        "localitytype": { "type": "string" },
+        "street":       { "type": "string" },
+        "streettype":   { "type": "string" },
+        "house":        { "type": "string" },
+        "korpus":       { "type": "string" },
+        "stroenie":     { "type": "string" }
+      },
+      "required": ["type"]
+    },
+
+    "address_type": {
+      "type": "string",
+      "enum": ["home", "work", "registration"]
+    },
+
+    "documents": {
+      "description": "schema for DOCUMENTS attribute",
+      "type": "array",
+      "items": { "$ref": "#/definitions/document" }
+    },
+
+    "document": {
+      "type": "object",
+      "properties": {
+        "type":           { "$ref": "#/definitions/document_type" },
+        "series":         { "type": "string" },
+        "number":         { "type": "string" },
+        "issueDate":      { "$ref": "#/definitions/date" },
+        "issueAuthority": { "type": "string" }
+      },
+      "required": ["type"]
+    },
+
+    "document_type": {
+      "type": "string",
+      "enum": ["passport_ru"]
+    },
+
+    "date": {
+      "type": "string",
+      "pattern": "^(0[1-9]|[12][0-9]|3[01])\\.(0[1-9]|1[012])\\.([0-9]{4})$"
+    },
+
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "controlGroup": { "type": "boolean" }
+      }
+    }
+
+  },
+
+  "type": "object",
+  "properties" : {
+    "id": { "type": "string" },
+    "data": { "$ref": "#/definitions/data" },
+    "metadata": { "$ref": "#/definitions/metadata" }
+  },
+  "required": ["id", "data"]
+}

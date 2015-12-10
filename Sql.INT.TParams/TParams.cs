@@ -87,37 +87,75 @@ namespace INT
       return FData.TryGetValue(AName, out AValue);
     }
 
+    private void AppendToStringEx(String AName, Object AValue, String AListSeparator, StringBuilder AResult)
+    {
+      SqlDbType LSqlDbType = Sql.GetSqlType(AValue);
+      if(AResult.Length > 0)
+        AResult.Append(AListSeparator);
+
+      AResult.Append
+      (
+        String.Format
+        (
+          "{0}{1}={2}", 
+          EncodeName(AName),
+          LSqlDbType == SqlDbType.NVarChar ?
+            ""
+            :
+            (":" + (LSqlDbType == SqlDbType.Udt ? ((SqlUdt)AValue).TypeName : LSqlDbType.ToString())),
+              Sql.IsQuoteType(LSqlDbType) ?
+                Strings.Quote(Sql.ValueToString(AValue, Sql.ValueDbStyle.SQL), '"')
+                :
+                Sql.ValueToString(AValue, Sql.ValueDbStyle.SQL))
+        );
+    }
+
     /// <summary>
     /// Преобразует данные в строку
     /// </summary>
     /// <returns>Возвращает список параметров строкой</returns>
-    public override String ToString()
+    public String CastAsString()
     {
-      StringBuilder w = new StringBuilder();
+      return CastAsStringAll(ListSeparator.ToString()); 
+    }
+
+    private String CastAsStringAll(String AListSeparator, Boolean ANullIfEmpty = false)
+    {
+      StringBuilder LStringBuilder = new StringBuilder();
 
       // Параметры
       foreach (KeyValuePair<String, Object> LDataPair in FData)
         if (LDataPair.Key[0] != '=')
-        {
-          SqlDbType type = Sql.GetSqlType(LDataPair.Value);
-          if(w.Length > 0)
-            w.Append(ListSeparator);
+          AppendToStringEx(LDataPair.Key, LDataPair.Value, AListSeparator, LStringBuilder);
 
-          w.Append
-          (
-            String.Format
-            (
-              "{0}{1}={2}", 
-              EncodeName(LDataPair.Key),
-              type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LDataPair.Value).TypeName : type.ToString())),
-              Sql.IsQuoteType(type) ?
-                Strings.Quote(Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL), '"')
-                :
-                Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.SQL))
-            );
-        }
+      return (ANullIfEmpty && LStringBuilder.Length == 0) ? null : LStringBuilder.ToString();
+    }
 
-      return w.ToString();
+    /// <summary>
+    /// Преобразует перечисленные параметры в строку
+    /// </summary>
+    /// <returns>Возвращает список параметров строкой</returns>
+    public String CastAsStringCustom(String ANames, String AListSeparator = null)
+    {
+      if(String.IsNullOrEmpty(ANames) || Count == 0) return null;
+
+      if(AListSeparator == null)
+        AListSeparator = ListSeparator.ToString();
+
+      if(ANames != null && ANames == "*")
+        return CastAsStringAll(AListSeparator, true);
+
+      StringBuilder LStringBuilder = new StringBuilder();
+
+      // Параметры
+      foreach (String LName in ANames.Split(new Char[]{';'}, StringSplitOptions.RemoveEmptyEntries))
+      {
+        Object LValue;
+        if (!FData.TryGetValue(LName, out LValue)) continue;
+        AppendToStringEx(LName, LValue, AListSeparator, LStringBuilder);
+      }
+
+      return LStringBuilder.Length == 0 ? null : LStringBuilder.ToString();
     }
 
     /// <summary>
@@ -126,15 +164,15 @@ namespace INT
     /// <returns>Возвращает список параметров строкой XML</returns>
     public String ToXMLString(String AElement = null)
     {
-      StringBuilder sb = new StringBuilder();
+      StringBuilder LStringBuilder = new StringBuilder();
+
       XmlWriterSettings s = new XmlWriterSettings();
       s.ConformanceLevel = ConformanceLevel.Fragment;
       s.Indent = true;
-      XmlWriter w = XmlWriter.Create(sb, s);
-      //w.Settings.
+      XmlWriter LXmlWriter = XmlWriter.Create(LStringBuilder, s);
 
       if(AElement != null)
-        w.WriteStartElement(AElement);
+        LXmlWriter.WriteStartElement(AElement);
 
       foreach (KeyValuePair<String, Object> LDataPair in FData)
       {
@@ -142,54 +180,19 @@ namespace INT
         String LValue = Sql.ValueToString(LDataPair.Value, Sql.ValueDbStyle.XML);
         if (AElement != null)
         {
-          w.WriteStartAttribute(LName);
-          w.WriteValue(LValue);
-          w.WriteEndAttribute();
+          LXmlWriter.WriteStartAttribute(LName);
+          LXmlWriter.WriteValue(LValue);
+          LXmlWriter.WriteEndAttribute();
         }
         else
-          w.WriteElementString(LName, LValue);
+          LXmlWriter.WriteElementString(LName, LValue);
       }
 
       if(AElement != null)
-        w.WriteEndElement();
+        LXmlWriter.WriteEndElement();
 
-      w.Close();
-      return sb.ToString();
-    }
-
-    /// <summary>
-    /// Преобразует перечисленные параметры в строку
-    /// </summary>
-    /// <returns>Возвращает список параметров строкой</returns>
-    public virtual String ToStringEx(String ANames)
-    {
-      if(String.IsNullOrEmpty(ANames)) return null;
-      StringBuilder w = new StringBuilder();
-
-      // Параметры
-      foreach (String LName in ANames.Split(new Char[]{';'}, StringSplitOptions.RemoveEmptyEntries))
-      {
-        Object LValue;
-        if (!FData.TryGetValue(LName, out LValue)) continue;
-        SqlDbType type = Sql.GetSqlType(LValue);
-        if(w.Length > 0)
-          w.Append(ListSeparator);
-
-        w.Append
-        (
-          String.Format
-          (
-            "{0}{1}={2}", 
-            EncodeName(LName),
-            type == SqlDbType.NVarChar ? "" : (":" + (type == SqlDbType.Udt ? ((SqlUdt)LValue).TypeName : type.ToString())),
-            Sql.IsQuoteType(type) ?
-              Strings.Quote(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL), '"')
-              :
-              Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL))
-          );
-      }
-
-      return w.Length == 0 ? null : w.ToString();
+      LXmlWriter.Close();
+      return LStringBuilder.ToString();
     }
 
     public static Object TextToValue(String AValue, String AType)
@@ -208,14 +211,26 @@ namespace INT
     /// <param name="s">Список параметров, заданный строкой</param>
     public void FromString(String s)
     {
-      Clear();
-      if (String.IsNullOrEmpty(s)) return;
+      LoadFromString(AString: s, ASeparator: ListSeparator);
+    }
+
+    public void LoadFromString
+    (
+      String              AString,
+      Char                ASeparator,
+      TLoadValueCondition ALoadValueCondition = TLoadValueCondition.lvcAlways,
+      Char                AParamPrefix        = '\0',
+      TParams             AParams             = null
+    )
+    {
+      if (String.IsNullOrEmpty(AString)) return;
+      //TLoadValueCondition LLoadValueCondition = Pub.LoadValueConditionParser(ALoadValueCondition);
 
       Pub.NamedItemsParser Parser =
         new Pub.NamedItemsParser
             (
-              s,
-              new Char[] {ListSeparator, '\r', '\n' },
+              AString,
+              new Char[] { ASeparator, '\r', '\n' },
               true
              );
 
@@ -223,167 +238,48 @@ namespace INT
       {
         try
         {
-          // Парсим значение
-          SqlDbType LSqlDbType = Sql.TypeFromString(Parser.Current.CastAs);
-          //if (Sql.IsQuoteType(LSqlDbType))
-          //  SValue = Strings.UnQuote(SValue, new Char[] { '"' });
+          String LName  = Parser.Current.Name.Trim();
+          String SValue = Parser.Current.Value;
+          if(Parser.Current.Quote == '\0')
+            SValue = SValue.Trim();
 
           Object LValue;
-          if (LSqlDbType == SqlDbType.Udt)
-            LValue = new SqlUdt(Parser.Current.CastAs, Parser.Current.Value);
-          else
-            LValue = Sql.ValueFromString(Parser.Current.Value, LSqlDbType, Sql.ValueDbStyle.SQL);
+          if
+          (
+            AParamPrefix != '\0'
+                && Parser.Current.Quote == '\0'
+                //&& String.IsNullOrEmpty(Parser.Current.CastAs)
+                && !String.IsNullOrEmpty(SValue)
+                && SValue[0] == AParamPrefix
+          )
+          {
+            if (AParams != null && AParams.FData.TryGetValue(SValue.Substring(1), out LValue))
+            {
+              if (ALoadValueCondition != TLoadValueCondition.lvcIfNotPresent || !FData.ContainsKey(LName))
+                AddParam(LName, LValue);
+            }
+            else if (ALoadValueCondition == TLoadValueCondition.lvcAlways)
+              AddParam(LName, DBNull.Value);
+          }
+          else if (ALoadValueCondition != TLoadValueCondition.lvcIfNotPresent || !FData.ContainsKey(LName))
+          {
+            // Парсим значение
+            SqlDbType LSqlDbType = Sql.TypeFromString(Parser.Current.CastAs);
 
-          AddParam(DecodeName(Parser.Current.Name), LValue);
+            if (LSqlDbType == SqlDbType.Udt)
+              LValue = new SqlUdt(Parser.Current.CastAs, SValue);
+            else
+              LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
+            AddParam(LName, LValue);
+          }
+
         }
         catch (Exception E)
         {
-          throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", s, E.Message));
+          throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", AString, E.Message));
         }
       }
     }
-/*
-    public void FromString(String s)
-    {
-      Clear();
-      if (String.IsNullOrEmpty(s)) return;
-
-      s += ListSeparator;
-
-      String LName = "";
-      String LType = null;
-
-      Int32 startName  = 0;
-      Int32 startType  = 0;
-      Int32 startValue = 0;
-
-      Boolean skip = false; // Если следующий символ <]> не в VALUE или <"> в VALUE
-      Boolean next = false;
-
-      Char LQuoteChar = '\0';
-
-      for (Int32 i = 0; i < s.Length; i++)
-      {
-        if (skip) { skip = false; continue; };
-
-        Char LCurrChar = s[i];
-        if (LQuoteChar != '\0')
-        {
-          if(LCurrChar != LQuoteChar) continue;
-          if(i < s.Length - 1 && s[i + 1] == LQuoteChar)
-          {
-
-          }
-        }
-
-        if (LCurrChar != '\r' && LCurrChar != '\n' && LCurrChar != ListSeparator)
-          switch (LCurrChar)
-          {
-            case ':':
-              if (startValue == 0 && startType == 0)
-              {
-                LName = s.Substring(startName, i - startName);
-                startType = i + 1;
-              }
-              next = true;
-              break;
-
-            case '=':
-              if (startValue == 0)
-              {
-                if (startType > 0)
-                {
-                  LType = s.Substring(startType, i - startType);
-                  LName = s.Substring(startName, startType - startName - 1);
-                }
-                else
-                  LName = s.Substring(startName, i - startName);
-                startValue = i + 1;
-              }
-              next = true;
-              break;
-
-            case '[':
-              if (startValue == 0)
-              {
-                if (LQuoteChar == '\0')
-                  LQuoteChar = ']';
-                else
-                  LQuoteChar = '\0';
-              }
-              next = true;
-              break;
-
-            case ']':
-              if (startValue == 0)
-              {
-                if (i < s.Length - 1 && s[i + 1] == ']')
-                  skip = true;
-                else
-                  LQuoteChar = '\0';
-              }
-              next = true;
-              break;
-
-            case '"':
-              if (startValue != 0)
-              {
-                if (LQuoteChar == '\0')
-                  LQuoteChar = '"';
-                else if (i < s.Length - 1 && s[i + 1] == '"')
-                  skip = true;
-                else
-                  LQuoteChar = '\0';
-              }
-              next = true;
-              break;
-
-            default:
-              next = true;
-              break;
-          }
-
-        if (next)
-          next = false;
-        else if (startValue > 0)
-        {
-          try
-          {
-            // Парсим значение
-            String SValue = s.Substring(startValue, i - startValue);
-            SqlDbType LSqlDbType = Sql.TypeFromString(LType);
-            if (Sql.IsQuoteType(LSqlDbType))
-              SValue = Strings.UnQuote(SValue, new Char[] { '"' });
-
-            Object LValue;
-            if (LSqlDbType == SqlDbType.Udt)
-              LValue = new SqlUdt(LType, SValue);
-            else
-              LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
-
-            // Добавляем параметр
-            AddParam(DecodeName(LName), LValue);
-
-            LName = "";
-            LType = null;
-
-            startName   = i + 1;
-            startType   = 0;
-            startValue  = 0;
-          }
-          catch (Exception E)
-          {
-            throw new Exception(String.Format("Неверно задано значение TParams '{0}': {1}", s, E.Message));
-          }
-        }
-        else if (LQuoteChar == '\0' && s.Substring(startName).Trim() != "")
-          throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует значение", s));
-      }
-
-      if (LQuoteChar != '\0')
-        throw new Exception(String.Format("Неверно задано значение TParams '{0}': отсутствует '{1}'", s, LQuoteChar));
-    }
-*/
 
     /// <summary>
     /// Проверяет имя параметра на корректность
@@ -468,7 +364,7 @@ namespace INT
     /// </summary>
     /// <param name="name">Имя параметра</param>
     /// <returns>Значение параметра типа NVarChar</returns>
-    protected SqlString AsNVarChar(String AName)
+    protected SqlString AsSqlString(String AName)
     {
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return SqlString.Null;
@@ -477,7 +373,8 @@ namespace INT
       else if (LValue is SqlChars) return ((SqlChars)LValue).ToSqlString();
       else return (SqlString)Sql.ValueToString(LValue, Sql.ValueDbStyle.Text);
     }
-    protected SqlChars AsNVarCharMax(String AName)
+
+    protected SqlChars AsSqlChars(String AName)
     {
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return SqlChars.Null;
@@ -487,10 +384,10 @@ namespace INT
       else return new SqlChars(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text));
     }
 
-    public static SqlString AsNVarChar(TParams AParams, String AName)
+    public static SqlString AsSqlString(TParams AParams, String AName)
     {
       if(AParams == null) return SqlString.Null;
-      return AParams.AsNVarChar(AName);
+      return AParams.AsSqlString(AName);
     }
 
 
@@ -1808,7 +1705,7 @@ namespace INT
     }
 
     enum FormatTypes { TinyInt, SmallInt, Int, BigInt, Hex, Date, Time, DateTime, DateTimeOffset, String, VarChar, NVarChar, Float, Decimal, Numeric, Boolean, Bit };
-    protected static String Format(TParams AParams, String AFormat)
+    protected static String Format(String AFormat, TParams AParams)
     {
       const Char CParamChar  = ':';
       const Char CStickQuote = '|';

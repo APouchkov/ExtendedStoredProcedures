@@ -2519,9 +2519,45 @@ namespace UDT_EMPTY
       /// Форматирует строку
       /// </summary>
       [SqlMethod(Name = "Format", OnNullCall = true)]
-      public SqlString Format(SqlString value)
+      public static String Format(SqlString value, TParams_EMPTY AParams)
       {
         return null;
       }
+
+      [SqlMethod(Name = "FormatMax", OnNullCall = true)]
+      public static SqlChars FormatMax(SqlString value, TParams_EMPTY AParams)
+      {
+        return SqlChars.Null;
+      }
+
+      [SqlMethod(Name = "Load", IsMutator = true, OnNullCall = true, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+      public void Load(TParams_EMPTY ASource, String AAliases, Char ALoadValueCondition = 'A')
+      {
+      }
+
+      [SqlMethod(Name = "Copy", IsMutator = false, OnNullCall = false, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+      public TParams_EMPTY Copy(String Names)
+      {
+        return null;
+      }
+
+      [SqlMethod(Name = "Overwrite", IsMutator = false, OnNullCall = true, IsDeterministic = true, DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read)]
+      public static TParams_EMPTY Overwrite(TParams_EMPTY AStorage, TParams_EMPTY ALoad, String ALoadAliases, Char ALoadValueCondition = 'A')
+      {
+        return null;
+      }
+
+      [SqlMethod(Name = "ToStringEx", OnNullCall = false, IsDeterministic = true)]
+      public SqlString ToStringEx(String ANames, String AListSeparator)
+      {
+        return SqlString.Null;
+      }
+
+      [SqlMethod(Name = "ToXMLString", OnNullCall = true, IsDeterministic = true)]
+      public String ToXMLString(String AElement = null)
+      {
+        return null;
+      }
+
     }
 }
