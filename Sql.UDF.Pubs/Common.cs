@@ -11,6 +11,8 @@ public enum TCommentMethods : byte { None = TCommentMethod.None, Lattice = TComm
 
 public partial class Pub
 {
+  public static readonly Char[] Spaces = new Char[2] {' ', '\t'};
+
   public static TLoadValueCondition LoadValueConditionParser(Char AOption)
   {
     switch (AOption)
@@ -149,7 +151,18 @@ public partial class Pub
       }
 
       if (FPosition < FString.Length)
-        FCurrent.Quote = Strings.InternalGetRightQuote(FString[FPosition], FQuotes);
+      {
+        int LPosition = FPosition;
+        while(FPosition < FString.Length && Spaces.Contains(FString[LPosition])) LPosition++;
+        if(LPosition == FPosition)
+          FCurrent.Quote = Strings.InternalGetRightQuote(FString[FPosition], FQuotes);
+        else
+        {
+          FCurrent.Quote = Strings.InternalGetRightQuote(FString[LPosition], FQuotes);
+          if(FCurrent.Quote != '\0')
+            FPosition = LPosition;
+        }
+      }
       else
         FCurrent.Quote = '\0';
 

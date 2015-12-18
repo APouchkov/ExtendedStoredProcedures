@@ -27,6 +27,10 @@ using Microsoft.SqlServer.Server;
 
 public class ScriptParser
 {
+#if DEBUG
+  private int FLevel = 0;
+#endif
+
   private const String ContextConnection = "context connection=true";
 
   private static readonly Char[] Returns    = new Char[2] {'\r', '\n'};
@@ -84,6 +88,7 @@ public class ScriptParser
     private String  FGap;
     private String  FCommand;
     private String  FValue;
+    private String  FMarker;
 
     public TCommentMethods Comments { get { return FComments; } }
     public Char Literal { get { return FLiteral; } }
@@ -96,6 +101,7 @@ public class ScriptParser
     public String Command { get { return FCommand; } }
 
     public String Value { get { return FValue; } }
+    public String Marker { get { return FMarker; } }
 
     public TParsingText(String AText, TCommentMethods AComments, Char ALiteral)
     {
@@ -112,6 +118,7 @@ public class ScriptParser
       FGap     = "";
       FCommand = "";
       FValue   = "";
+      FMarker  = null;
 
       MoveToNextChar();
     }
@@ -125,11 +132,14 @@ public class ScriptParser
 
       Position.Index++;
       if (Position.Index < Length)
+      {
         Position.CurrChar = FInput[Position.Index];
+        if(Position.CurrChar == '\n') Position.Line++;
+      }
       else
       {
         Position.CurrChar = '\0';
-        FEof      = true;
+        FEof = true;
       }
 
       if (Position.Index < Length - 1)
@@ -168,7 +178,7 @@ public class ScriptParser
     public Boolean MoveNext()
     {
       int LPosition;
-      int LLine = Position.Line;
+      //int LLine = Position.Line;
       Boolean LWaitForCommand = false;
       Boolean LInLiteral = false;
       TCommentMethod LCurrComment;
@@ -182,18 +192,36 @@ public class ScriptParser
 
       for (;;) /*(FPosition <= FLength)*/
       {
-        if(Position.CurrChar == (char)13) LLine++;
-
         if(LWaitForCommand && Position.CurrChar == '}')
         {
           LWaitForCommand = false;
           FCommand = FInput.Substring(LPosition, Position.Index - LPosition).TrimEnd();
-          int LIndex = 0;
+
           int LLength = FCommand.Length;
-          //Char[] LSpaces = new Char[3];
+          int LIndex;
+
+          if(Position.PriorChar == '$')
+          {
+            LLength--;
+            FCommand = FCommand.Remove(LLength);
+            LIndex = LLength - 1;
+            for(; LIndex > 0 && !AllSpaces.Contains(FCommand[LIndex]); LIndex--);
+
+            if (LIndex > 0)
+            {
+              FMarker  = FCommand.Substring(LIndex + 1);
+              FCommand = FCommand.Remove(LIndex).TrimEnd();
+              LLength  = FCommand.Length;
+            }
+            else
+              FMarker = "";
+          }
+          else
+            FMarker = null;
+
+          LIndex = 0;
 
           for(; LIndex < LLength && !AllSpaces.Contains(FCommand[LIndex]); LIndex++);
-          
 
           if(LIndex < LLength)
           {
@@ -256,7 +284,7 @@ public class ScriptParser
           FCommand = "";
           FValue   = "";
           FEof   = true;
-          Position.Line  = LLine;
+          //Position.Line  = LLine;
           return true;
         }
         else if (!LWaitForCommand && Position.CurrChar == '{' && Position.NextChar == '$')
@@ -266,7 +294,7 @@ public class ScriptParser
           SkipText(ref LPosition, false);
           FBol = (Position.PriorChar == (Char)13 || Position.PriorChar == (Char)10);
           MoveToNextChar(); MoveToNextChar(); LPosition++;
-          Position.Line = LLine;
+          //Position.Line = LLine;
           continue;
         }
         else if(!LInLiteral && !LWaitForCommand && LCurrComment == TCommentMethod.None)
@@ -418,6 +446,7 @@ ref TParsingText          AInput,
     UDT.TParams           AParams,
 
     TScriptParserWaitFor  AWaitFor        = TScriptParserWaitFor.None,
+    String                AWaitForMarker  = null,
     Boolean               ASkipText       = false,
     Boolean               AParentSkipText = false,
     StringBuilder         AText           = null
@@ -432,23 +461,45 @@ ref TParsingText          AInput,
     if(AText == null)
       AText = FOutput;
 
+#if DEBUG
+    FLevel++;
+#endif
+
     while (AInput.MoveNext())
     {
       if(!LSkipText) AText.Append(AInput.Gap);
 
       if(!String.IsNullOrEmpty(AInput.Command))
       {
-        //SqlContext.Pipe.Send("Command: " + FCommand + ", FValue = " + FValue + ", AWaitFor = " + AWaitFor.ToString() + ", LSkipText = " + LSkipText.ToString() + ", LElseIfCompleted = " + LElseIfCompleted.ToString());
+#if DEBUG
+        SqlContext.Pipe.Send
+        (
+          "Level = " + FLevel.ToString() 
+            + ", Command: " + AInput.Command 
+            + ", FValue = " + AInput.Value 
+            + ", AWaitFor = " + AWaitFor.ToString() 
+            + ", LSkipText = " + LSkipText.ToString() 
+            + ", LElseIfCompleted = " + LElseIfCompleted.ToString()
+        );
+#endif
 
         if (AInput.Command == "IF" || AInput.Command == "IFDEF" || AInput.Command == "IFNDEF")
         {
           Boolean LIfTrue = (!LSkipText) && InternalCallIF(ACommand: AInput.Command, AValue: AInput.Value, AParams: AParams, AInput: ref AInput);
+          String LMarker = AInput.Marker;
+
+          if(LMarker != null && LMarker.Length == 0)
+            if(AInput.Command == "IF")
+              AInput.Exception("Команда <IF> не поддерживает автоименование маркера");
+            else
+              LMarker = AInput.Value;
 
           CallIF
           (
             AInput          : ref AInput,
             AParams         : AParams,
             AWaitFor        : TScriptParserWaitFor.Else | TScriptParserWaitFor.End | TScriptParserWaitFor.EndIf,
+            AWaitForMarker  : LMarker,
             ASkipText       : !LIfTrue,
             AParentSkipText : AParentSkipText || LSkipText
           );
@@ -459,6 +510,9 @@ ref TParsingText          AInput,
         else if (AInput.Command == "FOREACH")
         {
           TParsingPosition LPosition = AInput.Position;
+          String LMarker = AInput.Marker;
+          if(LMarker != null && LMarker.Length == 0)
+            LMarker = AInput.Command;
 
           InitSqlCommandOther();
           FSqlCommandOther.CommandText = DynamicSQL.FinalSQL(AInput.Value, AParams);
@@ -476,9 +530,10 @@ ref TParsingText          AInput,
 
             CallIF
             (
-              AInput: ref AInput,
-              AParams: AParams,
-              AWaitFor: TScriptParserWaitFor.End
+              AInput        : ref AInput,
+              AParams       : AParams,
+              AWaitFor      : TScriptParserWaitFor.End,
+              AWaitForMarker: LMarker
             );
           }
           foreach (DataColumn LColumn in LDataTable.Columns)
@@ -489,21 +544,47 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "END" || AInput.Command == "ENDIF" || AInput.Command == "IFEND")
         {
-          if (AInput.Bol) AInput.InternalSkipReturns();
+          String LMarker = AInput.Marker;
+          if(LMarker != null && LMarker.Length == 0)
+            AInput.Exception("Команда <" + AInput.Command + "> не поддерживает автоименование маркера");
 
           TScriptParserWaitFor LCommand = AInput.Command == "END" ? TScriptParserWaitFor.End : TScriptParserWaitFor.EndIf;
           if ((AWaitFor & LCommand) == 0)
-            AInput.Exception("Найден инструкция конца блока {$" + AInput.Command + "} без предшествующей ей инструкции открытия блока");
+            AInput.Exception("Найдена инструкция конца блока {$" + AInput.Command + "} без предшествующей ей инструкции открытия блока.");
 
+          if((LMarker != null || AWaitForMarker != null) && LMarker != AWaitForMarker)
+            AInput.Exception
+            (
+              "Инструкции конца блока {$" + AInput.Command + " " + (LMarker ?? "<Null>")
+                + "$} содержит маркер, отличный от ожидаемого: " + (AWaitForMarker ?? "<Null>")
+            );
+
+
+          if (AInput.Bol) AInput.InternalSkipReturns();
+
+#if DEBUG
+          FLevel--;
+#endif
           return;
         }
 
         else if (AInput.Command == "ELSE")
         {
+          String LMarker = AInput.Marker;
+          if(LMarker != null && LMarker.Length == 0)
+            AInput.Exception("Команда <" + AInput.Command + "> не поддерживает автоименование маркера");
+
           if (AInput.Bol) AInput.InternalSkipReturns();
 
           if ((AWaitFor & TScriptParserWaitFor.Else) == 0)
             AInput.Exception("Найдена инструкция {$ELSE} без предшествующей ей инструкции {$IF}");
+
+          if((LMarker != null || AWaitForMarker != null) && LMarker != AWaitForMarker)
+            AInput.Exception
+            (
+              "Инструкции {$" + AInput.Command + " " + (LMarker ?? "<Null>")
+                + "$} содержит маркер, отличный от ожидаемого: " + (AWaitForMarker ?? "<Null>")
+            );
 
           if (AInput.Value.Length > 0)
           {
@@ -548,6 +629,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "I" || AInput.Command == "INCLUDE")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           byte LDepth;
@@ -561,6 +644,8 @@ ref TParsingText          AInput,
 
         else if (FTranslateScalar != null && (AInput.Command == "T" || AInput.Command == "TRANSLATE"))
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           byte LDepth;
@@ -582,6 +667,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "SELECT" || AInput.Command == "EXEC")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           byte LDepth;
@@ -605,6 +692,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "IMPORT")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           InitSqlCommandOther();
@@ -631,6 +720,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "DEFINE")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           InitSqlCommandOther();
@@ -655,23 +746,30 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "SET" || AInput.Command == "APPEND")
         {
-          if (LSkipText) continue;
-
           int LEqual = AInput.Value.IndexOf('=');
           if (LEqual < 0)
           {
-            //Exception("Пропущен символ присвоения '=': " + FCommand + ' ' + FValue);
+            String LMarker = AInput.Marker;
+            if(LMarker != null && LMarker.Length == 0)
+              LMarker = AInput.Value;
+
             Boolean LSet = (AInput.Command == "SET");
             String LName = AInput.Value;
 
             StringBuilder LText = new StringBuilder();
             CallIF
             (
-              AInput  : ref AInput,
-              AParams : AParams,
-              AWaitFor: TScriptParserWaitFor.End,
-              AText   : LText
+              AInput        : ref AInput,
+              AParams       : AParams,
+              AWaitFor      : TScriptParserWaitFor.End,
+              AWaitForMarker: LMarker,
+              AText         : LText,
+
+              //ASkipText       : LSkipText,
+              AParentSkipText : AParentSkipText || LSkipText
             );
+            if (LSkipText) continue;
+
             if (LSet)
               AParams.AddParam(LName, new SqlString(LText.ToString()));
             else
@@ -685,6 +783,10 @@ ref TParsingText          AInput,
           }
           else
           {
+            if(AInput.Marker != null)
+              AInput.Exception("Комманда <" + AInput.Command + " NAME=VALUE> не поддерживает использование маркера");
+            if (LSkipText) continue;
+
             String LName = AInput.Value.Substring(0, LEqual).TrimEnd();
             if (LName.Length == 0)
               AInput.Exception("Имя макроса должно быть непустым: " + AInput.Command + ' ' + AInput.Value);
@@ -707,6 +809,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "CLEAR")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           AParams.DeleteParam(AInput.Value);
@@ -716,6 +820,8 @@ ref TParsingText          AInput,
 
         else if (AInput.Command == "C" || AInput.Command == "COMMENT")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           AInput.InternalSkipReturns();
@@ -723,6 +829,8 @@ ref TParsingText          AInput,
 
         else if (FUseScalar != null && (AInput.Command == "U" || AInput.Command == "USE"))
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           String LStringFValue = AInput.Value.Trim();
@@ -736,7 +844,8 @@ ref TParsingText          AInput,
           }
 
           int LIndex = LStringFValue.IndexOfAny(AllSpaces);
-          FSqlCommandUseScalar.Parameters[0].Value = LIndex == -1 ? LStringFValue : LStringFValue.Substring(0, LIndex);
+          String LUseModule = LIndex == -1 ? LStringFValue : LStringFValue.Substring(0, LIndex);
+          FSqlCommandUseScalar.Parameters[0].Value = LUseModule;
           Object LValue = FSqlCommandUseScalar.ExecuteScalar();
           if (LValue != null && LValue != DBNull.Value)
           {
@@ -753,17 +862,27 @@ ref TParsingText          AInput,
 
             StringBuilder LText = new StringBuilder();
             TParsingText LParsingText = new TParsingText(AText: LValue.ToString(), AComments: AInput.Comments, ALiteral: AInput.Literal);
-            CallIF
-            (
-              AInput: ref LParsingText,
-              AParams: LParams
-            );
+
+            try
+            {
+              CallIF
+              (
+                AInput: ref LParsingText,
+                AParams: LParams
+              );
+            }
+            catch (Exception E)
+            {
+              AInput.Exception("USE " + LUseModule + ": " + E.Message);
+            }
           }
 
           //AText.Append(AInput.InternalDeepQuote(LValue.ToString(), LDepth));
         }
         else if (AInput.Command == "EXCEPTION")
         {
+          if(AInput.Marker != null)
+            AInput.Exception("Комманда <" + AInput.Command + "> не поддерживает использование маркера");
           if (LSkipText) continue;
 
           AInput.Exception(String.IsNullOrWhiteSpace(AInput.Value) ? "Abstract error" : AInput.Value);
