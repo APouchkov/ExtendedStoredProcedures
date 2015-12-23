@@ -27,7 +27,7 @@
     <RootNamespace>SQL</RootNamespace>
     <UpgradeBackupLocation>D:\Work\Projects\Extended Stored Procedures\Sql.UDP.GetResults\Backup\</UpgradeBackupLocation>
     <IsWebBootstrapper>false</IsWebBootstrapper>
-    <TargetFrameworkVersion>v4.0</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
     <PublishUrl>publish\</PublishUrl>
     <Install>true</Install>
     <InstallFrom>Disk</InstallFrom>
@@ -42,7 +42,7 @@
     <ApplicationVersion>1.0.0.%2a</ApplicationVersion>
     <UseApplicationTrust>false</UseApplicationTrust>
     <BootstrapperEnabled>true</BootstrapperEnabled>
-    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql110DatabaseSchemaProvider</DSP>
+    <DSP>Microsoft.Data.Tools.Schema.Sql.Sql120DatabaseSchemaProvider</DSP>
     <Name>Sql.UDP.GetResults</Name>
     <ProjectVersion>4.1</ProjectVersion>
     <ProjectGuid>{70546fe5-a32d-4045-8e54-555f7b612825}</ProjectGuid>
@@ -52,7 +52,7 @@
     <ModelCollation>1033,CI</ModelCollation>
     <DefaultFileStructure>BySchemaAndSchemaType</DefaultFileStructure>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <DefaultSchema>SQL</DefaultSchema>
+    <DefaultSchema>dbo</DefaultSchema>
     <TargetLanguage>CS</TargetLanguage>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
@@ -74,8 +74,7 @@
     <Optimize>true</Optimize>
     <OutputPath>bin\Release\</OutputPath>
     <EnableUnmanagedDebugging>false</EnableUnmanagedDebugging>
-    <DefineConstants>
-    </DefineConstants>
+    <DefineConstants>TPARAMS</DefineConstants>
     <WarningLevel>4</WarningLevel>
     <CodeAnalysisRuleSet>AllRules.ruleset</CodeAnalysisRuleSet>
     <BuildScriptName>$(MSBuildProjectName).sql</BuildScriptName>

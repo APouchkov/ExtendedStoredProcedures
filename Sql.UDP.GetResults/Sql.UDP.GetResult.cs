@@ -13,7 +13,6 @@ public static class DynamicSQL
 {
   private const String ContextConnection = "context connection=true";
 
-
   /// <summary>
   /// Обёртка OPENQUERY вокруг SQL-запроса
   /// </summary>
@@ -26,58 +25,6 @@ public static class DynamicSQL
 
     return "EXEC(" + Strings.Quote(AQuery, '\'') + ") AT " + Strings.Quote(ALinkedServer, '[');
   }
-
-  //[SqlFunction(Name = "Final SQL(Custom)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  // EXEC [A].[B] :Param1, :[Param2], :[$Params;Param2]
-  public static String FinalSQLEx(String ASQL, UDT.TParams AParams, Boolean AOnlyQuoted)
-  {
-    if(String.IsNullOrEmpty(ASQL)) return ASQL;
-
-    StringBuilder Result = new StringBuilder(ASQL.Length);
-
-    Sql.ParamsParser Parser =
-      new Sql.ParamsParser
-          (
-            ASQL,
-            ':',
-            TCommentMethods.DoubleMinus | TCommentMethods.SlashRange,
-            new char[] { '[' },
-            new char[] { '\'', '"', '[' }
-          );
-
-    while (Parser.MoveNext())
-    {
-      Result.Append(Parser.Current.Gap);
-      Object LParamValue;
-      if (!String.IsNullOrEmpty(Parser.Current.Value))
-        if (AOnlyQuoted && (Parser.Current.Quote == (Char)0))
-        {
-          Result.Append(':');
-          Result.Append(Parser.Current.Value);
-        }
-        else if (AParams == null)
-          Result.Append("NULL");
-        else if(Parser.Current.Value[0] == '$')
-        {
-          String LValues = (Parser.Current.Value.Length == 1 ? AParams.CastAsString() : AParams.CastAsStringCustom(Parser.Current.Value.Substring(1)));
-          Result.Append(LValues == null ? "NULL" : Strings.QuoteString(LValues));
-        }
-        else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))
-        {
-          Result.Append(Sql.ValueToText(LParamValue, Sql.ValueDbStyle.SQL, '\''));
-        }
-        else
-          Result.Append("NULL");
-    }
-
-    return Result.ToString();
-  }
-
-  [SqlFunction(Name = "Final SQL", DataAccess = DataAccessKind.None, IsDeterministic = true)]
-  public static String FinalSQL(String ASQL, UDT.TParams AParams)
-  {
-    return FinalSQLEx(ASQL, AParams, false);
-  } 
 
   [SqlFunction(Name = "Execute Scalar", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
   public static Object ExecuteScalar(String AQuery)
@@ -98,167 +45,6 @@ public static class DynamicSQL
     return ExecuteScalar(OpenQueryString(ALinkedServer, AQuery));
   }
 
-  /// <summary>
-  /// Параметризованный скалярный запрос
-  /// </summary>
-  [SqlFunction(Name = "Execute Scalar(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static Object ExecuteParameterizedScalar(String AQuery, UDT.TParams AParams)
-  {
-    return ExecuteScalar(FinalSQL(AQuery, AParams));
-  }
-
-  /// <summary>
-  /// Параметризованный скалярный запрос к Linked-серверу
-  /// </summary>
-  [SqlFunction(Name = "Execute Remote Scalar(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static Object ExecuteRemoteParameterizedScalar(String ALinkedServer, String AQuery, UDT.TParams AParams)
-  {
-    return ExecuteScalar(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
-  }
-
-  /// <summary>
-  /// Выполнение SQL-запроса
-  /// </summary>
-  private static UDT.TParams InternalExecuteRow(String AQuery)
-  {
-    using (SqlConnection connection = new SqlConnection(ContextConnection))
-    {
-      connection.Open();
-      using (SqlCommand cmd = new SqlCommand(AQuery, connection))
-      using (SqlDataReader reader = cmd.ExecuteReader())
-      {
-        if (reader.IsClosed) return null;
-
-        object[] values = new object[reader.FieldCount];
-
-        if (!reader.Read()) return null;
-
-        reader.GetSqlValues(values);
-        UDT.TParams LFields = UDT.TParams.New();
-        for (int i = reader.FieldCount - 1; i >= 0; i--)
-        {
-          if (!reader.IsDBNull(i))
-            LFields.AddParam(reader.GetName(i), values[i]);
-        }
-        return LFields;
-      }
-    }
-  }
-
-  /// <summary>
-  /// Строчный запрос
-  /// </summary>
-  [SqlFunction(Name = "Execute Row", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static UDT.TParams ExecuteRow(String AQuery)
-  {
-    if (String.IsNullOrEmpty(AQuery)) return null;
-
-    return (UDT.TParams)InternalExecuteRow(AQuery);
-  }
-
-  /// <summary>
-  /// Строчный запрос к Linked-серверу
-  /// </summary>
-  [SqlFunction(Name = "Execute Remote Row", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static UDT.TParams ExecuteRemoteRow(String ALinkedServer, String AQuery)
-  {
-    return InternalExecuteRow(OpenQueryString(ALinkedServer, AQuery));
-  }
-
-  /// <summary>
-  /// Параметризованный строчный запрос
-  /// </summary>
-  [SqlFunction(Name = "Execute Row(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static UDT.TParams ExecuteParameterizedRow(String AQuery, UDT.TParams AParams)
-  {
-    if (String.IsNullOrEmpty(AQuery)) return null;
-
-    return InternalExecuteRow(FinalSQL(AQuery, AParams));
-  }
-
-  /// <summary>
-  /// Параметризованный строчный запрос к Linked-серверу
-  /// </summary>
-  [SqlFunction(Name = "Execute Remote Row(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
-  public static UDT.TParams ExecuteParameterizedRemoteRow(String ALinkedServer, String AQuery, UDT.TParams AParams)
-  {
-    return InternalExecuteRow(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
-  }
-
-  /// <summary>
-  /// Статический табличный запрос
-  /// </summary>
-  [SqlFunction(Name = "Open Query", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
-  public static IEnumerable OpenQuery(String ASQL)
-  {
-    if (String.IsNullOrEmpty(ASQL)) return null;
-
-      List<UDT.TParams> Rows = new List<UDT.TParams>();
-
-      using (SqlConnection conn = new SqlConnection(ContextConnection))
-      {
-        conn.Open();
-        using (SqlCommand cmd = new SqlCommand(ASQL, conn))
-        using (SqlDataReader reader = cmd.ExecuteReader())
-        {
-          if (!reader.IsClosed)
-          {
-            object[] values = new object[reader.FieldCount];
-
-            while (reader.Read())
-            {
-              reader.GetSqlValues(values);
-              UDT.TParams LFields = UDT.TParams.New();
-              for (int i = reader.FieldCount - 1; i >= 0; i--)
-              {
-                if (!reader.IsDBNull(i))
-                  LFields.AddParam(reader.GetName(i), values[i]);
-              }
-              Rows.Add(LFields);
-              //yield return LFields;
-            }
-          }
-        }
-      }
-
-    return Rows;
-  }
-  public static void OpenQueryRow(object Row, out UDT.TParams Value)
-  {
-    Value = (UDT.TParams)Row;
-  }
-
-  /// <summary>
-  /// Статический табличный запрос к Linked-серверу
-  /// </summary>
-  [SqlFunction(Name = "Open Remote Query", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
-  public static IEnumerable OpenRemoteQuery(String ALinkedServer, String ASQL)
-  {
-    return OpenQuery(OpenQueryString(ALinkedServer, ASQL));
-  }
-
-  /// <summary>
-  /// Параметризированный табличный запрос
-  /// </summary>
-  [SqlFunction(Name = "Open Query(Params)", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
-  public static IEnumerable OpenParameterizedQuery(String ASQL, UDT.TParams AParams)
-  {
-    if (String.IsNullOrEmpty(ASQL)) return null;
-
-    return OpenQuery(FinalSQL(ASQL, AParams));
-  }
-
-  /// <summary>
-  /// Параметризированный табличный запрос к Linked-серверу
-  /// </summary>
-  [SqlFunction(Name = "Open Remote Query(Params)", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
-  public static IEnumerable OpenParameterizedRemoteQuery(String ALinkedServer, String ASQL, UDT.TParams AParams)
-  {
-    return OpenQuery(OpenQueryString(ALinkedServer, FinalSQL(ASQL, AParams)));
-  }
-
-  //
-
   //private const String PARAM_DATASET_NUMBER   = "dataset_number";
   private const String PARAM_RESULTSETS = "ResultSets";
   private const String PARAM_QUERY      = "Query";
@@ -272,10 +58,12 @@ public static class DynamicSQL
 
   public struct TRowSetMap
   {
-    public int    RowSet;
-    public string Fields;
+    public Int16  Index;
+    public String Name;
+    public String Fields;
   }
 
+  // <ROWSET1|NAME1>:<ALIAS1>=<NAME1>;
   public static List<TRowSetMap> ExtractRowSetMaps(String AResultSets)
   {
     List<TRowSetMap> AMaps = new List<TRowSetMap>();
@@ -283,19 +71,26 @@ public static class DynamicSQL
 
     try
     {
-      foreach (String MapText in AResultSets.Split(new char[] {';'}))
+      foreach (String LRowSet in AResultSets.Split(new char[] {';'}))
       {
-        int Idx = MapText.IndexOf(':');
+        int Idx = LRowSet.IndexOf(':');
+        String LNameOrIndex;
         if(Idx >= 0)
         {
-          LMap.RowSet = Convert.ToInt16(MapText.Substring(0, Idx));
-          LMap.Fields = MapText.Substring(Idx + 1);
+          LNameOrIndex = LRowSet.Substring(0, Idx);
+          LMap.Fields = LRowSet.Substring(Idx + 1);
         }
         else
         {
-          LMap.RowSet = Convert.ToInt16(MapText);
-          LMap.Fields = "";
+          LNameOrIndex  = LRowSet;
+          LMap.Fields   = "";
         }
+
+        if(Int16.TryParse(LNameOrIndex, out LMap.Index))
+          LMap.Name = null;
+        else
+          LMap.Name = LNameOrIndex;
+
         AMaps.Add(LMap);
       }
     }
@@ -308,80 +103,113 @@ public static class DynamicSQL
   }
 
   [SqlProcedure(Name = "Execute=>XML")]
-  public static void ExecuteToXML(String AQuery, String AResultSets, out SqlXml AXml, String ATag) // , SqlBoolean AIncludeMetadata
+  public static void ExecuteToXML
+  (
+    String AQuery,
+    String AResultSets,
+out SqlXml AXml,
+    String ARowsetNamePrefix  = null,
+    String ARootTag           = null,
+    String ARowsetTag         = null,
+    String ARowTag            = null
+  )
   {
     const String ROWSET_TAG = "ROWSET";
 
     if (String.IsNullOrEmpty(AQuery))
       throw new ArgumentNullException(PARAM_QUERY);
 
-    if (String.IsNullOrEmpty(ATag))
-      ATag = ROWSET_TAG;
+    if (String.IsNullOrEmpty(ARowsetTag))
+      ARowsetTag = ROWSET_TAG;
 
-    List<TRowSetMap> Maps;
-    TRowSetMap Map;
+    List<TRowSetMap> LMaps;
+    TRowSetMap LMap;
 
     if (AResultSets == null)
-      Maps = new List<TRowSetMap>();
+      LMaps = new List<TRowSetMap>();
     else
-      Maps = ExtractRowSetMaps(AResultSets);
+      LMaps = ExtractRowSetMaps(AResultSets);
 
-    Map.RowSet = -1;
-    Map.Fields = "";
+    LMap.Index  = -1;
+    LMap.Name   = null;
+    LMap.Fields = "";
 
-    using (SqlConnection conn = new SqlConnection(ContextConnection))
+    using (SqlConnection LSqlConnection = new SqlConnection(ContextConnection))
     {
-      conn.Open();
-      using (SqlCommand cmd = new SqlCommand(AQuery, conn))
-      using (SqlDataReader reader = cmd.ExecuteReader())
+      LSqlConnection.Open();
+
+      using (SqlCommand LSqlCommand = new SqlCommand(AQuery, LSqlConnection))
+      using (SqlDataReader LReader = LSqlCommand.ExecuteReader())
       {
-        int dataset_no = 0;
+        int LRowsetNo = 0;
         int i = 0;
+
         // !!! Нельзя делать ms.Dispose, потому что данные тянет из ms уже в T-SQL-коде ("извне" этой процедуры )
-        MemoryStream mem_stream = new MemoryStream();
-        XmlTextWriter xml_result = new XmlTextWriter(mem_stream, Encoding.Unicode); // Encoding.GetEncoding(1251)); // Windows-кодировка
+        MemoryStream  LMemoryStream = new MemoryStream();
+        XmlTextWriter LXml          = new XmlTextWriter(LMemoryStream, Encoding.Unicode);
+
+        if(!String.IsNullOrEmpty(ARootTag))
+          LXml.WriteStartElement(ARootTag);
+        else
+          AXml = SqlXml.Null;
 
         do
         {
+          if(LReader.IsClosed) break;
+
+          String LRowsetName = null;
+          //DataTable LDataTable = LReader.GetSchemaTable();
+          if (!String.IsNullOrEmpty(ARowsetNamePrefix))
+          {
+            String LColumn0Name = LReader.GetName(0);
+            //SqlContext.Pipe.Send("LColumn0Name = " + LColumn0Name);
+
+            if (!String.IsNullOrWhiteSpace(LColumn0Name) && LColumn0Name.StartsWith(ARowsetNamePrefix, StringComparison.InvariantCultureIgnoreCase))
+              LRowsetName = LColumn0Name.Substring(ARowsetNamePrefix.Length);
+          }
+
           if (AResultSets == null)
-            i = ++dataset_no;
+            i = ++LRowsetNo;
           else
           {
-            do
-            {
-              dataset_no++;
-              i = Maps.FindIndex( (delegate(TRowSetMap AMap) { return AMap.RowSet == dataset_no; }) );
-            } while ((i < 0) && reader.NextResult()) ; // Пропускаем ненужные датасеты
-            if(i >= 0)
-              Map = Maps[i++];
+            LRowsetNo++;
+            i = LMaps.FindIndex
+                (
+                  (
+                    delegate(TRowSetMap AMap)
+                    {
+                      return (AMap.Index > 0 && AMap.Index == LRowsetNo) || (AMap.Index == 0 && LRowsetName != null && AMap.Name == LRowsetName);
+                    }
+                  ) 
+                );
+            
+            if (i < 0) continue;
+            LMap = LMaps[i++];
           }
 
-          if (!reader.IsClosed)
-          {
-            xml_result.WriteStartElement(ATag);
-            xml_result.WriteStartAttribute(ATTRIBUTE_INDEX);
-            xml_result.WriteValue(i.ToString());
+          LXml.WriteStartElement(LRowsetName ?? ARowsetTag);
 
-            SqlDataReaderToXml(reader, xml_result, Map);
-            xml_result.WriteEndElement();
-          }
-        } // Читаем дальше, если есть что читать и не выбраны все номера нужных рекордсетов
-        while (reader.NextResult());
+          LXml.WriteStartAttribute(ATTRIBUTE_INDEX);
+          LXml.WriteValue(i.ToString());
 
-        xml_result.Flush();
+          //if(LRowsetName != null)
+          //{
+          //  LXml.WriteStartAttribute(ATTRIBUTE_NAME);
+          //  LXml.WriteValue(LRowsetName);
+          //}
 
-        AXml = new SqlXml(mem_stream);
+          SqlDataReaderToXml(LReader, LXml, (LRowsetName != null), ARowTag, LMap);
+          LXml.WriteEndElement();
+
+        } while (LReader.NextResult());
+
+        if(!String.IsNullOrEmpty(ARootTag))
+          LXml.WriteEndElement();
+
+        LXml.Flush();
+        AXml = new SqlXml(LMemoryStream);
       }
     }
-  }
-
-  //[SqlProcedure(Name = "Execute(Params)=>XML")]
-  public static void ExecuteParameterizedToXML(String AQuery, UDT.TParams AParams, String AResultSets, out SqlXml AXml, String ATag) // , SqlBoolean AIncludeMetadata
-  {
-    if (String.IsNullOrEmpty(AQuery))
-      throw new ArgumentNullException(PARAM_QUERY);
-
-    ExecuteToXML(FinalSQL(AQuery, AParams), AResultSets, out AXml, ATag);
   }
 
   [SqlProcedure(Name = "Execute")]
@@ -398,7 +226,8 @@ public static class DynamicSQL
     else
       Maps = ExtractRowSetMaps(AResultSets);
 
-    Map.RowSet = -1;
+    Map.Index  = -1;
+    Map.Name   = null;
     Map.Fields = "";
 
     using (SqlConnection conn = new SqlConnection(ContextConnection))
@@ -419,7 +248,7 @@ public static class DynamicSQL
             do
             {
               dataset_no++;
-              i = Maps.FindIndex( (delegate(TRowSetMap AMap) { return AMap.RowSet == dataset_no; }) );
+              i = Maps.FindIndex( (delegate(TRowSetMap AMap) { return AMap.Index == dataset_no; }) );
             } while ((i < 0) && reader.NextResult()) ; // Пропускаем ненужные датасеты
 
             if(i >= 0)
@@ -450,21 +279,6 @@ public static class DynamicSQL
     Execute(OpenQueryString(ALinkedServer, AQuery), AResultSets);
   }
 
-  [SqlProcedure(Name = "Execute(Params)")]
-  public static void ExecuteParameterized(String AQuery, UDT.TParams AParams, String AResultSets)
-  {
-    if (String.IsNullOrEmpty(AQuery))
-      throw new ArgumentNullException(PARAM_QUERY);
-
-    Execute(FinalSQL(AQuery, AParams), AResultSets);
-  }
-
-  [SqlProcedure(Name = "Remote Execute(Params)")]
-  public static void ExecuteRemoteParameterized(String ALinkedServer, String AQuery, UDT.TParams AParams, String AResultSets)
-  {
-    Execute(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)), AResultSets);
-  }
-
   [SqlProcedure(Name = "Execute=>Non Query")]
   public static void ExecuteNonQuery(String AQuery)
   {
@@ -483,21 +297,6 @@ public static class DynamicSQL
   public static void ExecuteRemoteNonQuery(String ALinkedServer, String AQuery)
   {
     ExecuteNonQuery(OpenQueryString(ALinkedServer, AQuery));
-  }
-
-  [SqlProcedure(Name = "Execute(Params)=>Non Query")]
-  public static void ExecuteParameterizedNonQuery(String AQuery, UDT.TParams AParams)
-  {
-    if (String.IsNullOrEmpty(AQuery))
-      throw new ArgumentNullException(PARAM_QUERY);
-
-    ExecuteNonQuery(FinalSQL(AQuery, AParams));
-  }
-
-  [SqlProcedure(Name = "Remote Execute(Params)=>Non Query")]
-  public static void ExecuteRemoteParameterizedNonQuery(String ALinkedServer, String AQuery, UDT.TParams AParams)
-  {
-    ExecuteNonQuery(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
   }
 
   private static void SendTable(SqlDataReader reader, TRowSetMap Map)
@@ -675,106 +474,388 @@ public static class DynamicSQL
     public Int32  FieldIndex;
   }
 
-  private static void SqlDataReaderToXml(SqlDataReader reader, XmlTextWriter writer, TRowSetMap Map)
+  private static void SqlDataReaderToXml
+  (
+    SqlDataReader AReader,
+    //DataTable     ADataTable,
+    XmlTextWriter AWriter,
+    Boolean       ASkipNameColumn,
+    String        ARowTag,
+    TRowSetMap    AMap
+  )
   {
     const String ROW_TAG      = "ROW";
     const String METADATA_TAG = "METADATA";
     const String FIELD_TAG    = "FIELD";
     const String NONAME_FIELD_PREFIX = "FIELD";
 
-    int i, empty_name_field_no = 1;
-    string FieldName;
+    int
+      i,
+      start_field_index   = ASkipNameColumn ? 1 : 0,
+      empty_name_field_no = 1;
+    String FieldName;
 
-    DataTable LDataTable = reader.GetSchemaTable();
-    List<TFieldAlias> Fields = new List<TFieldAlias>();
-    TFieldAlias Field;
-    int FieldCount = reader.FieldCount;
-    // SqlDataRecord Record = new SqlDataRecord(DataReaderFields(reader));
+    DataTable LDataTable = AReader.GetSchemaTable();
 
-    if(Map.Fields.Length > 0)
+    List<TFieldAlias> LFields = new List<TFieldAlias>();
+    TFieldAlias LField;
+    int FieldCount = AReader.FieldCount;
+
+    if(AMap.Fields.Length > 0)
     {
-      foreach (String FieldMap in Map.Fields.Split(new char[] {','}))
+      foreach (String FieldMap in AMap.Fields.Split(new char[] {','}))
       {
         i = FieldMap.IndexOf('=');
         if(i >= 0)
         {
-          Field.Name = FieldMap.Substring(0, i);
-          FieldName  = FieldMap.Substring(i + 1);
+          LField.Name = FieldMap.Substring(0, i);
+          FieldName   = FieldMap.Substring(i + 1);
         }
         else
         {
-          Field.Name = FieldMap;
-          FieldName  = FieldMap;
+          LField.Name = FieldMap;
+          FieldName   = FieldMap;
         }
-        for(i = 0; i < FieldCount; i++)
+        for(i = start_field_index; i < FieldCount; i++)
         {
-          if(FieldName.Equals(reader.GetName(i), StringComparison.InvariantCultureIgnoreCase))
+          if(FieldName.Equals(AReader.GetName(i), StringComparison.InvariantCultureIgnoreCase))
             break;
         }
         if((i < 0) || (i >= FieldCount))
           throw new SystemException("RowSet Field = [" + FieldName + "] not found.");
-        // Field.Name = XmlConvert.EncodeLocalName(Field.Name);
-        Field.FieldIndex = i;
-        Fields.Add(Field);
+        // LField.Name = XmlConvert.EncodeLocalName(LField.Name);
+        LField.FieldIndex = i;
+        LFields.Add(LField);
 
-        //writer.WriteStartAttribute(Field.Name);
-        //writer.WriteValue(SqlMetaDataToString(LDataTable.Rows[i]));
+        //AWriter.WriteStartAttribute(LField.Name);
+        //AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[i]));
       }
     }
     else
     {
-      for(Field.FieldIndex = 0; Field.FieldIndex < FieldCount; Field.FieldIndex++)
+      for(LField.FieldIndex = start_field_index; LField.FieldIndex < FieldCount; LField.FieldIndex++)
       {
-        FieldName = reader.GetName(Field.FieldIndex);
+        FieldName = AReader.GetName(LField.FieldIndex);
         if(FieldName.Length == 0)
           FieldName = NONAME_FIELD_PREFIX + (empty_name_field_no++).ToString();
-        Field.Name = FieldName;
-        //Field.Name = XmlConvert.EncodeLocalName(FieldName);
-        Fields.Add(Field);
+        LField.Name = FieldName;
+        //LField.Name = XmlConvert.EncodeLocalName(FieldName);
+        LFields.Add(LField);
 
-        //writer.WriteStartAttribute(Field.Name);
-        //writer.WriteValue(SqlMetaDataToString(LDataTable.Rows[Field.FieldIndex]));
+        //AWriter.WriteStartAttribute(LField.Name);
+        //AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[LField.FieldIndex]));
       }
     }
 
-    writer.WriteStartElement(METADATA_TAG);
-    for (i = 0; i < Fields.Count; i++)
+    AWriter.WriteStartElement(METADATA_TAG);
+    for (i = 0; i < LFields.Count; i++)
     {
-      writer.WriteStartElement(FIELD_TAG);
-        writer.WriteStartAttribute(ATTRIBUTE_INDEX);
-        writer.WriteValue(i + 1);
-        writer.WriteStartAttribute(ATTRIBUTE_NAME);
-        writer.WriteValue(Fields[i].Name);
-        writer.WriteStartAttribute(ATTRIBUTE_TYPE);
-        writer.WriteValue(SqlMetaDataToString(LDataTable.Rows[Fields[i].FieldIndex]));
-      writer.WriteEndElement();
+      AWriter.WriteStartElement(FIELD_TAG);
+        AWriter.WriteStartAttribute(ATTRIBUTE_INDEX);
+        AWriter.WriteValue(i + 1);
+        AWriter.WriteStartAttribute(ATTRIBUTE_NAME);
+        AWriter.WriteValue(LFields[i].Name);
+        AWriter.WriteStartAttribute(ATTRIBUTE_TYPE);
+        AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[LFields[i].FieldIndex]));
+      AWriter.WriteEndElement();
     }
-    writer.WriteEndElement();
+    AWriter.WriteEndElement();
 
     object Value;
-    while (reader.Read())
+    while (AReader.Read())
     {
-      writer.WriteStartElement(ROW_TAG);
+      AWriter.WriteStartElement(ARowTag ?? ROW_TAG);
 
-      for (i = 0; i < Fields.Count; i++)
+      for (i = 0; i < LFields.Count; i++)
       {
-        Value = reader.GetValue(Fields[i].FieldIndex); 
+        Value = AReader.GetValue(LFields[i].FieldIndex); 
         if (Value != DBNull.Value) // NULL пропускаем
         {
-          writer.WriteStartAttribute(XmlConvert.EncodeLocalName(Fields[i].Name));
+          AWriter.WriteStartAttribute(XmlConvert.EncodeLocalName(LFields[i].Name));
           try
           {
-            writer.WriteValue(Value);
+            AWriter.WriteValue(Value);
           }
           catch (InvalidCastException)
           {
-            writer.WriteValue(Value.ToString());
+            AWriter.WriteValue(Value.ToString());
           }
 
-          writer.WriteEndAttribute();
+          AWriter.WriteEndAttribute();
         }
       }
-      writer.WriteEndElement();
+      AWriter.WriteEndElement();
     }
   }
+
+#if TPARAMS
+  //[SqlFunction(Name = "Final SQL(Custom)", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  // EXEC [A].[B] :Param1, :[Param2], :[$Params;Param2]
+  public static String FinalSQLEx(String ASQL, UDT.TParams AParams, Boolean AOnlyQuoted)
+  {
+    if(String.IsNullOrEmpty(ASQL)) return ASQL;
+
+    StringBuilder Result = new StringBuilder(ASQL.Length);
+
+    Sql.ParamsParser Parser =
+      new Sql.ParamsParser
+          (
+            ASQL,
+            ':',
+            TCommentMethods.DoubleMinus | TCommentMethods.SlashRange,
+            new char[] { '[' },
+            new char[] { '\'', '"', '[' }
+          );
+
+    while (Parser.MoveNext())
+    {
+      Result.Append(Parser.Current.Gap);
+      Object LParamValue;
+      if (!String.IsNullOrEmpty(Parser.Current.Value))
+        if (AOnlyQuoted && (Parser.Current.Quote == (Char)0))
+        {
+          Result.Append(':');
+          Result.Append(Parser.Current.Value);
+        }
+        else if (AParams == null)
+          Result.Append("NULL");
+        else if(Parser.Current.Value[0] == '$')
+        {
+          String LValues = (Parser.Current.Value.Length == 1 ? AParams.CastAsString() : AParams.CastAsStringCustom(Parser.Current.Value.Substring(1)));
+          Result.Append(LValues == null ? "NULL" : Strings.QuoteString(LValues));
+        }
+        else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))
+        {
+          Result.Append(Sql.ValueToText(LParamValue, Sql.ValueDbStyle.SQL, '\''));
+        }
+        else
+          Result.Append("NULL");
+    }
+
+    return Result.ToString();
+  }
+
+  [SqlFunction(Name = "Final SQL", DataAccess = DataAccessKind.None, IsDeterministic = true)]
+  public static String FinalSQL(String ASQL, UDT.TParams AParams)
+  {
+    return FinalSQLEx(ASQL, AParams, false);
+  } 
+
+  /// <summary>
+  /// Параметризованный скалярный запрос
+  /// </summary>
+  [SqlFunction(Name = "Execute Scalar(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static Object ExecuteParameterizedScalar(String AQuery, UDT.TParams AParams)
+  {
+    return ExecuteScalar(FinalSQL(AQuery, AParams));
+  }
+
+  /// <summary>
+  /// Параметризованный скалярный запрос к Linked-серверу
+  /// </summary>
+  [SqlFunction(Name = "Execute Remote Scalar(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static Object ExecuteRemoteParameterizedScalar(String ALinkedServer, String AQuery, UDT.TParams AParams)
+  {
+    return ExecuteScalar(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
+  }
+
+  /// <summary>
+  /// Выполнение SQL-запроса
+  /// </summary>
+  private static UDT.TParams InternalExecuteRow(String AQuery)
+  {
+    using (SqlConnection connection = new SqlConnection(ContextConnection))
+    {
+      connection.Open();
+      using (SqlCommand cmd = new SqlCommand(AQuery, connection))
+      using (SqlDataReader reader = cmd.ExecuteReader())
+      {
+        if (reader.IsClosed) return null;
+
+        object[] values = new object[reader.FieldCount];
+
+        if (!reader.Read()) return null;
+
+        reader.GetSqlValues(values);
+        UDT.TParams LFields = UDT.TParams.New();
+        for (int i = reader.FieldCount - 1; i >= 0; i--)
+        {
+          if (!reader.IsDBNull(i))
+            LFields.AddParam(reader.GetName(i), values[i]);
+        }
+        return LFields;
+      }
+    }
+  }
+
+  /// <summary>
+  /// Строчный запрос
+  /// </summary>
+  [SqlFunction(Name = "Execute Row", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static UDT.TParams ExecuteRow(String AQuery)
+  {
+    if (String.IsNullOrEmpty(AQuery)) return null;
+
+    return (UDT.TParams)InternalExecuteRow(AQuery);
+  }
+
+  /// <summary>
+  /// Строчный запрос к Linked-серверу
+  /// </summary>
+  [SqlFunction(Name = "Execute Remote Row", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static UDT.TParams ExecuteRemoteRow(String ALinkedServer, String AQuery)
+  {
+    return InternalExecuteRow(OpenQueryString(ALinkedServer, AQuery));
+  }
+
+  /// <summary>
+  /// Параметризованный строчный запрос
+  /// </summary>
+  [SqlFunction(Name = "Execute Row(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static UDT.TParams ExecuteParameterizedRow(String AQuery, UDT.TParams AParams)
+  {
+    if (String.IsNullOrEmpty(AQuery)) return null;
+
+    return InternalExecuteRow(FinalSQL(AQuery, AParams));
+  }
+
+  /// <summary>
+  /// Параметризованный строчный запрос к Linked-серверу
+  /// </summary>
+  [SqlFunction(Name = "Execute Remote Row(Params)", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, IsDeterministic = false)]
+  public static UDT.TParams ExecuteParameterizedRemoteRow(String ALinkedServer, String AQuery, UDT.TParams AParams)
+  {
+    return InternalExecuteRow(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
+  }
+
+  /// <summary>
+  /// Статический табличный запрос
+  /// </summary>
+  [SqlFunction(Name = "Open Query", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
+  public static IEnumerable OpenQuery(String ASQL)
+  {
+    if (String.IsNullOrEmpty(ASQL)) return null;
+
+      List<UDT.TParams> Rows = new List<UDT.TParams>();
+
+      using (SqlConnection conn = new SqlConnection(ContextConnection))
+      {
+        conn.Open();
+        using (SqlCommand cmd = new SqlCommand(ASQL, conn))
+        using (SqlDataReader reader = cmd.ExecuteReader())
+        {
+          if (!reader.IsClosed)
+          {
+            object[] values = new object[reader.FieldCount];
+
+            while (reader.Read())
+            {
+              reader.GetSqlValues(values);
+              UDT.TParams LFields = UDT.TParams.New();
+              for (int i = reader.FieldCount - 1; i >= 0; i--)
+              {
+                if (!reader.IsDBNull(i))
+                  LFields.AddParam(reader.GetName(i), values[i]);
+              }
+              Rows.Add(LFields);
+              //yield return LFields;
+            }
+          }
+        }
+      }
+
+    return Rows;
+  }
+  public static void OpenQueryRow(object Row, out UDT.TParams Value)
+  {
+    Value = (UDT.TParams)Row;
+  }
+
+  /// <summary>
+  /// Статический табличный запрос к Linked-серверу
+  /// </summary>
+  [SqlFunction(Name = "Open Remote Query", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
+  public static IEnumerable OpenRemoteQuery(String ALinkedServer, String ASQL)
+  {
+    return OpenQuery(OpenQueryString(ALinkedServer, ASQL));
+  }
+
+  /// <summary>
+  /// Параметризированный табличный запрос
+  /// </summary>
+  [SqlFunction(Name = "Open Query(Params)", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
+  public static IEnumerable OpenParameterizedQuery(String ASQL, UDT.TParams AParams)
+  {
+    if (String.IsNullOrEmpty(ASQL)) return null;
+
+    return OpenQuery(FinalSQL(ASQL, AParams));
+  }
+
+  /// <summary>
+  /// Параметризированный табличный запрос к Linked-серверу
+  /// </summary>
+  [SqlFunction(Name = "Open Remote Query(Params)", FillRowMethodName = "OpenQueryRow", DataAccess = DataAccessKind.Read, SystemDataAccess = SystemDataAccessKind.Read, TableDefinition = "[Fields] TParams", IsDeterministic = false)]
+  public static IEnumerable OpenParameterizedRemoteQuery(String ALinkedServer, String ASQL, UDT.TParams AParams)
+  {
+    return OpenQuery(OpenQueryString(ALinkedServer, FinalSQL(ASQL, AParams)));
+  }
+
+  //[SqlProcedure(Name = "Execute(Params)=>XML")]
+  public static void ExecuteParameterizedToXML
+  (
+    String      AQuery,
+    UDT.TParams AParams, 
+    String      AResultSets,
+out SqlXml      AXml,
+    String      ARowsetNamePrefix  = null,
+    String      ARootTag           = null,
+    String      ARowsetTag         = null,
+    String      ARowTag            = null
+  )
+  {
+    if (String.IsNullOrEmpty(AQuery))
+      throw new ArgumentNullException(PARAM_QUERY);
+
+    ExecuteToXML
+    (
+      AQuery            :     FinalSQL(AQuery, AParams), 
+      AResultSets       :     AResultSets, 
+      AXml              : out AXml, 
+      ARowsetNamePrefix : ARowsetNamePrefix,
+      ARootTag          : ARootTag,
+      ARowsetTag        : ARowsetTag,
+      ARowTag           : ARowTag 
+    );
+  }
+
+  [SqlProcedure(Name = "Execute(Params)")]
+  public static void ExecuteParameterized(String AQuery, UDT.TParams AParams, String AResultSets)
+  {
+    if (String.IsNullOrEmpty(AQuery))
+      throw new ArgumentNullException(PARAM_QUERY);
+
+    Execute(FinalSQL(AQuery, AParams), AResultSets);
+  }
+
+  [SqlProcedure(Name = "Remote Execute(Params)")]
+  public static void ExecuteRemoteParameterized(String ALinkedServer, String AQuery, UDT.TParams AParams, String AResultSets)
+  {
+    Execute(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)), AResultSets);
+  }
+
+  [SqlProcedure(Name = "Execute(Params)=>Non Query")]
+  public static void ExecuteParameterizedNonQuery(String AQuery, UDT.TParams AParams)
+  {
+    if (String.IsNullOrEmpty(AQuery))
+      throw new ArgumentNullException(PARAM_QUERY);
+
+    ExecuteNonQuery(FinalSQL(AQuery, AParams));
+  }
+
+  [SqlProcedure(Name = "Remote Execute(Params)=>Non Query")]
+  public static void ExecuteRemoteParameterizedNonQuery(String ALinkedServer, String AQuery, UDT.TParams AParams)
+  {
+    ExecuteNonQuery(OpenQueryString(ALinkedServer, FinalSQL(AQuery, AParams)));
+  }
+#endif
 }
