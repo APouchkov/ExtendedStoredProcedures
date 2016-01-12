@@ -1,7 +1,7 @@
 ECHO OFF
 
 REM Копируем сборку
-copy "bin\Release\UDF.HTTPRequest.dll" "\\BD-VM-DBATEST\d$\Programms\Extended Stored Procedures\" /y
+copy "bin\Release\UDF.HTTPRequest.dll" "\\BD-VM-DV-CIS\Programms\Extended Stored Procedures" /y
 IF ERRORLEVEL 0 GOTO NEXT1
 GOTO ERROR
 

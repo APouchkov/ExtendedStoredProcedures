@@ -28,41 +28,126 @@ public partial class HTTP
 		SqlFunction
 		(
 			FillRowMethodName = "FillHTTPResponseRow",
-			DataAccess = DataAccessKind.None,
-			TableDefinition = "[Status] smallint, [Header] nvarchar(max), [Body] nvarchar(max)", 
-			IsDeterministic = true
+			DataAccess        = DataAccessKind.None,
+			TableDefinition   = "[Status] smallint, [Header] nvarchar(max), [Body] nvarchar(max)", 
+			IsDeterministic   = false
 		)
 	]
-	public static IEnumerable HTTPRequest(String AUrl, String AMethod, String AProxy)
+	public static IEnumerable HTTPRequestFunction
+  (
+    String AUrl,
+    String AMethod
+  )
 	{
-    return InternalHTTPRequest(AUrl, AMethod, AProxy);
+    Int16   RStatus;
+    String  RHeader;
+    String  RBody;
+
+    HTTPRequestMethod
+    (
+      AUrl: AUrl, AMethod: AMethod, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
+      ACheckSum: false,
+      RStatus: out RStatus, RHeader: out RHeader, RBody: out RBody
+    );
+
+		HTTPResponseRow LRow;
+    LRow.Status = RStatus;
+    LRow.Header = RHeader;
+    LRow.Body   = RBody;
+
+		List<HTTPResponseRow> LRows = new List<HTTPResponseRow>();
+    LRows.Add(LRow);
+
+    return LRows;
   }
 
 	[
 		SqlFunction
 		(
 			FillRowMethodName = "FillHTTPResponseRow",
-			DataAccess = DataAccessKind.None,
-			TableDefinition = "[Status] smallint, [Header] nvarchar(max), [CheckSum] nvarchar(4000)", 
-			IsDeterministic = true
+			DataAccess        = DataAccessKind.None,
+			TableDefinition   = "[Status] smallint, [Header] nvarchar(max), [CheckSum] nvarchar(4000)", 
+			IsDeterministic   = false
 		)
 	]
-	public static IEnumerable HTTPRequestCheckSum(String AUrl, String AMethod, String AProxy)
+	public static IEnumerable HTTPRequestCheckSumFunction(String AUrl, String AMethod)
 	{
-    return InternalHTTPRequest(AUrl, AMethod, AProxy, true);
+    Int16   RStatus;
+    String  RHeader;
+    String  RBody;
+
+    HTTPRequestMethod
+    (
+      AUrl: AUrl, AMethod: AMethod, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
+      ACheckSum: true,
+      RStatus: out RStatus, RHeader: out RHeader, RBody: out RBody
+    );
+
+		HTTPResponseRow LRow;
+    LRow.Status = RStatus;
+    LRow.Header = RHeader;
+    LRow.Body   = RBody;
+
+		List<HTTPResponseRow> LRows = new List<HTTPResponseRow>();
+    LRows.Add(LRow);
+
+    return LRows;
   }
 
-	public static IEnumerable InternalHTTPRequest(String AUrl, String AMethod, String AProxy, Boolean ACheckSum = false)
-	{
-		HTTPResponseRow row;
-		List<HTTPResponseRow> rows = new List<HTTPResponseRow>();
+	[SqlMethod(DataAccess = DataAccessKind.None,	IsDeterministic = false)]
+	public static void HTTPRequestMethod
+  (
+    String  AUrl,
+    String  AMethod,
 
+    String  AContentType,
+    String  AUserAgent,
+    String  ACookies,
+    String  AHeader,
+
+    String  AParams,
+    String  AProxy,
+
+    Boolean ACheckSum,
+
+    out Int16   RStatus,
+    out String  RHeader,
+    out String  RBody
+  )
+	{
 		try
 		{
-			WebRequest Request = WebRequest.Create(AUrl);
+			HttpWebRequest Request = (HttpWebRequest)WebRequest.Create(AUrl);
 
+      Request.KeepAlive             = false;
 			Request.UseDefaultCredentials = true;
 			Request.Method                = AMethod;
+
+      Request.ContentType = AContentType ?? "application/x-www-form-urlencoded"; 
+      Request.Accept = "*/*";
+
+      if(!String.IsNullOrEmpty(AUserAgent))
+        Request.UserAgent = AUserAgent;
+
+      if(!String.IsNullOrEmpty(AHeader))
+        foreach(String LHeaderLine in AHeader.Split(new Char[] { '\n' }, StringSplitOptions.RemoveEmptyEntries))
+          Request.Headers.Add(LHeaderLine);
+
+      if(!String.IsNullOrEmpty(ACookies))
+      {
+        Request.CookieContainer = new CookieContainer();
+        Request.CookieContainer.SetCookies(Request.RequestUri, ACookies);
+      }
+
+      if (!String.IsNullOrEmpty(AParams) && AMethod != "GET" && AMethod != "HEAD")
+      {
+          byte[] LData = Encoding.ASCII.GetBytes(AParams);
+          Request.ContentLength = LData.Length;
+          using (Stream LStream = Request.GetRequestStream())
+          {
+            LStream.Write(LData, 0, LData.Length);
+          }
+      }
 
 			if (!String.IsNullOrEmpty(AProxy))
 			{
@@ -74,13 +159,13 @@ public partial class HTTP
 			}
 
       HttpWebResponse Response = Request.GetResponse() as HttpWebResponse;
-      row.Status = 0;
-			row.Header = Response.Headers.ToString();
+      RStatus = 0;
+			RHeader = Response.Headers.ToString();
 
       if(ACheckSum)
       {
         SHA1 sha1Encrypter = new SHA1CryptoServiceProvider();
-        row.Body = BitConverter.ToString(sha1Encrypter.ComputeHash(Response.GetResponseStream()));
+        RBody = BitConverter.ToString(sha1Encrypter.ComputeHash(Response.GetResponseStream()));
       }
       else
       { 
@@ -92,18 +177,14 @@ public partial class HTTP
         }
         else
           LText = new StreamReader(Response.GetResponseStream());
-			  row.Body = LText.ReadToEnd();
+			  RBody = LText.ReadToEnd();
       }
-
-			rows.Add(row);
 		}
 		catch (Exception LException)
 		{
-			row.Status = 1;
-			row.Header = LException.Message;
-			row.Body   = null;
-			rows.Add(row);
+			RStatus = 1;
+			RHeader = LException.Message;
+			RBody   = null;
 		}
-		return rows;
 	}
 };
