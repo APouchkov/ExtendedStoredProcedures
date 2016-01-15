@@ -45,7 +45,8 @@ public partial class HTTP
 
     HTTPRequestMethod
     (
-      AUrl: AUrl, AMethod: AMethod, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
+      AUrl: AUrl, AMethod: AMethod, 
+      AKeepAlive: false, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
       ACheckSum: false,
       RStatus: out RStatus, RHeader: out RHeader, RBody: out RBody
     );
@@ -78,7 +79,8 @@ public partial class HTTP
 
     HTTPRequestMethod
     (
-      AUrl: AUrl, AMethod: AMethod, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
+      AUrl: AUrl, AMethod: AMethod, 
+      AKeepAlive: false, AHeader: null, AParams: null, AProxy: null, AContentType: null, AUserAgent: null, ACookies: null,
       ACheckSum: true,
       RStatus: out RStatus, RHeader: out RHeader, RBody: out RBody
     );
@@ -100,6 +102,7 @@ public partial class HTTP
     String  AUrl,
     String  AMethod,
 
+    Boolean AKeepAlive,
     String  AContentType,
     String  AUserAgent,
     String  ACookies,
@@ -119,7 +122,7 @@ public partial class HTTP
 		{
 			HttpWebRequest Request = (HttpWebRequest)WebRequest.Create(AUrl);
 
-      Request.KeepAlive             = false;
+      Request.KeepAlive             = AKeepAlive;
 			Request.UseDefaultCredentials = true;
 			Request.Method                = AMethod;
 
@@ -158,26 +161,32 @@ public partial class HTTP
 				Request.Proxy = Proxy;
 			}
 
-      HttpWebResponse Response = Request.GetResponse() as HttpWebResponse;
-      RStatus = 0;
-			RHeader = Response.Headers.ToString();
-
-      if(ACheckSum)
+      using (HttpWebResponse Response = Request.GetResponse() as HttpWebResponse)
       {
-        SHA1 sha1Encrypter = new SHA1CryptoServiceProvider();
-        RBody = BitConverter.ToString(sha1Encrypter.ComputeHash(Response.GetResponseStream()));
-      }
-      else
-      { 
-        StreamReader LText;
-        if(Response.CharacterSet.Length > 0)
+
+        RStatus = 0;
+        RHeader = Response.Headers.ToString();
+
+        if (ACheckSum)
         {
-          Encoding LEncoding = Encoding.GetEncoding(Response.CharacterSet);
-          LText = new StreamReader(Response.GetResponseStream(), LEncoding);
+          using (SHA1 sha1Encrypter = new SHA1CryptoServiceProvider())
+          {
+            RBody = BitConverter.ToString(sha1Encrypter.ComputeHash(Response.GetResponseStream()));
+          }
         }
         else
-          LText = new StreamReader(Response.GetResponseStream());
-			  RBody = LText.ReadToEnd();
+        {
+          StreamReader LText;
+          if (Response.CharacterSet.Length > 0)
+          {
+            Encoding LEncoding = Encoding.GetEncoding(Response.CharacterSet);
+            LText = new StreamReader(Response.GetResponseStream(), LEncoding);
+          }
+          else
+            LText = new StreamReader(Response.GetResponseStream());
+          RBody = LText.ReadToEnd();
+          LText.Close();
+        }
       }
 		}
 		catch (Exception LException)
