@@ -397,7 +397,7 @@ public partial class XmlRecords
   public static String XMLRecordsWrite(SqlXml AXml, SqlXml AReplacement, String ATags)
   {
     if(String.IsNullOrEmpty(ATags))
-      return AXml.Value;
+      return AXml.IsNull ? null : AXml.Value;
 
     StringBuilder LResult = null;
 
