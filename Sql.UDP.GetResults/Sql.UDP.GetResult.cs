@@ -111,7 +111,8 @@ out SqlXml AXml,
     String ARowsetNamePrefix  = null,
     String ARootTag           = null,
     String ARowsetTag         = null,
-    String ARowTag            = null
+    String ARowTag            = null,
+    String ARowIndexColumn    = null
   )
   {
     const String ROWSET_TAG = "ROWSET";
@@ -198,7 +199,7 @@ out SqlXml AXml,
           //  LXml.WriteValue(LRowsetName);
           //}
 
-          SqlDataReaderToXml(LReader, LXml, (LRowsetName != null), ARowTag, LMap);
+          SqlDataReaderToXml(LReader, LXml, (LRowsetName != null), ARowTag, ARowIndexColumn, LMap);
           LXml.WriteEndElement();
 
         } while (LReader.NextResult());
@@ -477,10 +478,10 @@ out SqlXml AXml,
   private static void SqlDataReaderToXml
   (
     SqlDataReader AReader,
-    //DataTable     ADataTable,
     XmlTextWriter AWriter,
     Boolean       ASkipNameColumn,
     String        ARowTag,
+    String        ARowIndexColumn,
     TRowSetMap    AMap
   )
   {
@@ -562,9 +563,17 @@ out SqlXml AXml,
     AWriter.WriteEndElement();
 
     object Value;
+    Int64 LIndex = 0;
     while (AReader.Read())
     {
       AWriter.WriteStartElement(ARowTag ?? ROW_TAG);
+
+      if(!String.IsNullOrEmpty(ARowIndexColumn))
+      {
+          AWriter.WriteStartAttribute(ARowIndexColumn);
+            AWriter.WriteValue(++LIndex);
+          AWriter.WriteEndAttribute();
+      }
 
       for (i = 0; i < LFields.Count; i++)
       {
