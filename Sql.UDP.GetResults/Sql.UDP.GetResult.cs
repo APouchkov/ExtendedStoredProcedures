@@ -417,7 +417,12 @@ out SqlXml AXml,
     };
   }
 
-  private static string SqlMetaDataToString(DataRow AColumn)
+  public struct TFieldMetaData
+  {
+    public SqlDbType  EnumType;
+    public String     StringType;
+  }
+  private static TFieldMetaData GetSqlMetaData(DataRow AColumn)
   {
     // Номера строк в таблице, возвращаемой SqlDataReader.GetSchemaTable
     // const int COLUMN_COLUMN_NAME        = 0;
@@ -427,9 +432,44 @@ out SqlXml AXml,
     const int COLUMN_NUMERIC_SCALE      = 4;
     const int COLUMN_DATA_TYPE          = 24;
 
-    String    LTypeName   = Convert.ToString(AColumn[COLUMN_DATA_TYPE]);
-    Int64     LMaxLength  = Convert.ToInt64(AColumn[COLUMN_LENGTH]);
+    //String    LTypeName   = Convert.ToString(AColumn[COLUMN_DATA_TYPE]);
+    TFieldMetaData  LReturnValue;
 
+    LReturnValue.StringType = Convert.ToString(AColumn[COLUMN_DATA_TYPE]);
+    try
+    {
+      LReturnValue.EnumType = (SqlDbType)Enum.Parse(typeof(SqlDbType), LReturnValue.StringType, true);
+    }
+    catch (ArgumentException)
+    {
+      throw new Exception("Неизвестное значение перечисления SqlDbType: '" + LReturnValue.StringType + '\'');
+    }
+
+    Int64 LMaxLength  = Convert.ToInt64(AColumn[COLUMN_LENGTH]);
+
+    if
+    (
+      LReturnValue.EnumType == SqlDbType.Char
+      || LReturnValue.EnumType == SqlDbType.NChar
+      || LReturnValue.EnumType == SqlDbType.VarChar
+      || LReturnValue.EnumType == SqlDbType.NVarChar
+      || LReturnValue.EnumType == SqlDbType.Binary
+      || LReturnValue.EnumType == SqlDbType.VarBinary
+    )
+      LReturnValue.StringType += "("  + (LMaxLength == -1 || LMaxLength > 8000 ? "Max" : LMaxLength.ToString()) + ")";
+    else if
+    (
+      LReturnValue.EnumType == SqlDbType.DateTime2
+      || LReturnValue.EnumType == SqlDbType.Time
+    )
+      LReturnValue.StringType += "("  + Convert.ToString(AColumn[COLUMN_NUMERIC_SCALE]) + ")";
+    else if
+    (
+      LReturnValue.EnumType == SqlDbType.Decimal
+    )
+      LReturnValue.StringType += "(" + Convert.ToString(AColumn[COLUMN_NUMERIC_PRECISION]) + "," + Convert.ToString(AColumn[COLUMN_NUMERIC_SCALE]) + ")";
+
+/*
     if
     (
       LTypeName.Equals(SqlDbType.Char.ToString(), StringComparison.InvariantCultureIgnoreCase)
@@ -443,6 +483,7 @@ out SqlXml AXml,
     else if
     (
       LTypeName.Equals(SqlDbType.DateTime2.ToString(), StringComparison.InvariantCultureIgnoreCase)
+      || LTypeName.Equals(SqlDbType.Time.ToString(), StringComparison.InvariantCultureIgnoreCase)
     )
       LTypeName += "("  + Convert.ToString(AColumn[COLUMN_NUMERIC_SCALE]) + ")";
     else if
@@ -450,8 +491,9 @@ out SqlXml AXml,
       LTypeName.Equals(SqlDbType.Decimal.ToString(), StringComparison.InvariantCultureIgnoreCase)
     )
       LTypeName += "(" + Convert.ToString(AColumn[COLUMN_NUMERIC_PRECISION]) + "," + Convert.ToString(AColumn[COLUMN_NUMERIC_SCALE]) + ")";
+*/
 
-    return LTypeName;
+    return LReturnValue;
   }
 
   private static SqlDbType SqlServerTypeToSqlDbType(string data_type)
@@ -473,6 +515,7 @@ out SqlXml AXml,
   {
     public String Name;
     public Int32  FieldIndex;
+    //public TFieldMetaData MetaData;
   }
 
   private static void SqlDataReaderToXml
@@ -524,14 +567,11 @@ out SqlXml AXml,
         }
         if((i < 0) || (i >= FieldCount))
           throw new SystemException("RowSet Field = [" + FieldName + "] not found.");
-        // LField.Name = XmlConvert.EncodeLocalName(LField.Name);
         LField.FieldIndex = i;
         LFields.Add(LField);
-
-        //AWriter.WriteStartAttribute(LField.Name);
-        //AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[i]));
       }
     }
+        // LField.Name = XmlConvert.EncodeLocalName(LField.Name);
     else
     {
       for(LField.FieldIndex = start_field_index; LField.FieldIndex < FieldCount; LField.FieldIndex++)
@@ -540,24 +580,25 @@ out SqlXml AXml,
         if(FieldName.Length == 0)
           FieldName = NONAME_FIELD_PREFIX + (empty_name_field_no++).ToString();
         LField.Name = FieldName;
-        //LField.Name = XmlConvert.EncodeLocalName(FieldName);
         LFields.Add(LField);
-
-        //AWriter.WriteStartAttribute(LField.Name);
-        //AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[LField.FieldIndex]));
       }
     }
 
     AWriter.WriteStartElement(METADATA_TAG);
+    List<SqlDbType> LFieldDbTypes = new List<SqlDbType>();
+    TFieldMetaData LMetaData;
     for (i = 0; i < LFields.Count; i++)
     {
+      LField = LFields[i];
       AWriter.WriteStartElement(FIELD_TAG);
         AWriter.WriteStartAttribute(ATTRIBUTE_INDEX);
         AWriter.WriteValue(i + 1);
         AWriter.WriteStartAttribute(ATTRIBUTE_NAME);
-        AWriter.WriteValue(LFields[i].Name);
+        AWriter.WriteValue(LField.Name);
         AWriter.WriteStartAttribute(ATTRIBUTE_TYPE);
-        AWriter.WriteValue(SqlMetaDataToString(LDataTable.Rows[LFields[i].FieldIndex]));
+        LMetaData = GetSqlMetaData(LDataTable.Rows[LField.FieldIndex]);
+        LFieldDbTypes.Add(LMetaData.EnumType);
+        AWriter.WriteValue(LMetaData.StringType);
       AWriter.WriteEndElement();
     }
     AWriter.WriteEndElement();
@@ -577,18 +618,24 @@ out SqlXml AXml,
 
       for (i = 0; i < LFields.Count; i++)
       {
-        Value = AReader.GetValue(LFields[i].FieldIndex); 
+        LField = LFields[i];
+        Value = AReader.GetValue(LField.FieldIndex); 
         if (Value != DBNull.Value) // NULL пропускаем
         {
-          AWriter.WriteStartAttribute(XmlConvert.EncodeLocalName(LFields[i].Name));
-          try
-          {
-            AWriter.WriteValue(Value);
-          }
-          catch (InvalidCastException)
-          {
+          AWriter.WriteStartAttribute(XmlConvert.EncodeLocalName(LField.Name));
+          //if(LDataTable.Rows[LField.FieldIndex]))
+
+          if(LFieldDbTypes[i] == SqlDbType.Time)
             AWriter.WriteValue(Value.ToString());
-          }
+          else
+            try
+            {
+              AWriter.WriteValue(Value);
+            }
+            catch (InvalidCastException)
+            {
+              AWriter.WriteValue(Value.ToString());
+            }
 
           AWriter.WriteEndAttribute();
         }
