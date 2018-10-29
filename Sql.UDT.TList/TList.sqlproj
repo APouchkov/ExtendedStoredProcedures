@@ -78,6 +78,13 @@
       <Private>False</Private>
     </Reference>
     <Reference Include="System.Core" />
+    <Reference Include="UDF.Pubs.Strings">
+      <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="UDF.Pubs.Arrays">
+      <HintPath>..\Sql.UDF.Pubs.Arrays\bin\Release\UDF.Pubs.Arrays.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="Properties\AssemblyInfo.cs" />
@@ -94,6 +101,7 @@
     <Compile Include="TDictionaryStringInt16.cs" />
     <Compile Include="TListDateTime.cs" />
     <Compile Include="TDictionaryDateString.cs" />
+    <Compile Include="TListVariant.cs" />
   </ItemGroup>
   <ItemGroup>
     <Folder Include="Test Scripts\" />
