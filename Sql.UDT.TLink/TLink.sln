@@ -1,7 +1,9 @@
 ﻿
-Microsoft Visual Studio Solution File, Format Version 11.00
-# Visual Studio 2010
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TLink", "TLink.csproj", "{D3EDAA24-B29D-4063-90EA-EA8D8C160884}"
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 14
+VisualStudioVersion = 14.0.24720.0
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{00D1A9C2-B5F0-4AF3-8072-F6C62B433612}") = "TLink", "TLink.sqlproj", "{0F2CE939-42CB-42B9-8891-31529426E44B}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -9,12 +11,12 @@ Global
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Release|Any CPU.Build.0 = Release|Any CPU
-		{D3EDAA24-B29D-4063-90EA-EA8D8C160884}.Release|Any CPU.Deploy.0 = Release|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Debug|Any CPU.Deploy.0 = Debug|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Release|Any CPU.Build.0 = Release|Any CPU
+		{0F2CE939-42CB-42B9-8891-31529426E44B}.Release|Any CPU.Deploy.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
