@@ -73,13 +73,16 @@
     <Reference Include="System.Xml" />
     <Reference Include="UDF.Pubs">
       <HintPath>..\Sql.UDF.Pubs\bin\Release\UDF.Pubs.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UDF.Pubs.Formats">
       <HintPath>..\Sql.UDF.Pubs.Formats\bin\Release\UDF.Pubs.Formats.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UDF.Pubs.Strings, Version=1.0.5771.29569, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
       <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
+      <Private>False</Private>
     </Reference>
     <Reference Include="UDT.TList">
       <HintPath>..\Sql.UDT.TList\bin\Release\UDT.TList.dll</HintPath>
