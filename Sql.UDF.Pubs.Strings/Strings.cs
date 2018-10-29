@@ -155,6 +155,16 @@ public class Strings
     return AQuote + AValue.Replace(new String(RQuote, 1), new String(RQuote, 2)) + RQuote;
   }
 
+  [SqlFunction(Name = "QuoteIfNeeded", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String QuoteIfNeeded(String AValue, Char AQuote)
+  {
+    Char RQuote = InternalGetRightQuote(AQuote);
+    if(AValue.IndexOf(AQuote) >= 0)
+      return AQuote + AValue.Replace(new String(RQuote, 1), new String(RQuote, 2)) + RQuote;
+    return AValue;
+  }
+
   [SqlFunction(Name = "Deep Quote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String DeepQuote(String AValue, Char AQuote, Byte ADepth)
@@ -186,6 +196,13 @@ public class Strings
     return Quote(AValue, '\'');
   }
 
+  [SqlFunction(Name = "Quote String(If Needed)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String QuoteStringIfNeeded(String AValue)
+  {
+    return QuoteIfNeeded(AValue, '\'');
+  }
+
   [SqlFunction(Name = "Deep Quote String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String DeepQuoteString(String AValue, Byte ADepth)
@@ -197,14 +214,39 @@ public class Strings
   // RETURNS NULL ON NULL INPUT
   public static String UnQuote(String AValue, Char[] AQuotes)
   {
-    if (String.IsNullOrEmpty(AValue) || AQuotes == null || AQuotes.Length == 0) return AValue;
+    if (AValue == null || AValue.Length < 2 || AQuotes == null || AQuotes.Length == 0) return AValue;
     Char LQuote = AValue[0];
-
-    if (!AQuotes.Contains(LQuote))
+    Char RQuote = InternalGetRightQuote(LQuote, AQuotes);
+    if (RQuote == (Char)0)
       return AValue;
+
+    if(AValue[AValue.Length - 1] != RQuote)
+      return AValue;
+
+      //if(AValue.Length < 800)
+      //  throw new System.SystemException("Unclosed quotation at string: " + AValue);
+      //else
+      //  throw new System.SystemException("Unclosed quotation at string");
+
+    return AValue.Substring(1, AValue.Length - 2).Replace(new string(RQuote, 2), RQuote.ToString());
+  }
+
+/*
+  [SqlFunction(Name = "UnQuoteCustom", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String UnQuoteCustom(String AValue, Char[] AQuotes)
+  {
+    if (AValue == null || AValue.Length < 2 || AQuotes == null || AQuotes.Length == 0) return AValue;
+
+    int LQuoIndex = AValue.IndexOfAny(AQuotes);
+    if (LQuoIndex == -1)
+      return AValue;
+
     Char RQuote = InternalGetRightQuote(LQuote);
     return AValue.Substring(1, AValue.Length - 2).Replace(new string(RQuote, 2), RQuote.ToString());
   }
+*/
+
 }
 
 /// <summary>
