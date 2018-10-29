@@ -105,6 +105,7 @@
     </Reference>
     <Reference Include="UDF.Pubs.Strings">
       <HintPath>..\Sql.UDF.Pubs.Strings\bin\Release\UDF.Pubs.Strings.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
