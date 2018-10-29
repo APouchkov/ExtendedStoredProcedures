@@ -111,6 +111,58 @@ public class Arrays
     AValue = (String)ARow;
   }
 
+  /// <summary>
+  /// Разбивает строку на подстроки по делителю с учётом потенциально локального квотирования.
+  /// </summary>
+  [SqlFunction(FillRowMethodName = "SplitRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Value] NVarChar(Max)", IsDeterministic = true)]
+  public static IEnumerable SplitString(String AText, Char ASeparator, Char[] AAllowedQuotes)
+  {
+    if (String.IsNullOrEmpty(AText)) yield break;
+
+    Char[] LMetaCharacters = new Char[AAllowedQuotes.Length + 1];
+    AAllowedQuotes.CopyTo(LMetaCharacters, 0);
+    LMetaCharacters[LMetaCharacters.Length - 1] = ASeparator;
+
+    String LTempResult = "";
+    int LCurrIndex = -1;
+
+    while(true)
+    {
+      int LNewIndex = AText.IndexOfAny(LMetaCharacters, LCurrIndex + 1);
+      if(LNewIndex == -1)
+      {
+        LTempResult = LTempResult + AText.Substring(LCurrIndex + 1);
+        yield return LTempResult;
+        yield break;
+      }
+
+      LTempResult = LTempResult + AText.Substring(LCurrIndex + 1, LNewIndex - LCurrIndex - 1);
+      LCurrIndex = LNewIndex;
+
+      Char LChar = AText[LNewIndex];
+      if(LChar == ASeparator)
+      {
+        yield return LTempResult;
+        LTempResult = "";
+      }
+      else
+      {
+        Char LRightQuote = Strings.InternalGetRightQuote(LChar);
+        LNewIndex = AText.IndexOf(LRightQuote, LCurrIndex + 1);
+        if(LNewIndex == -1)
+          if(AText.Length < 800)
+            throw new System.SystemException("Unclosed quotation at string: " + AText);
+          else
+            throw new System.SystemException("Unclosed quotation at string");
+
+        LTempResult = LTempResult + AText.Substring(LCurrIndex, LNewIndex - LCurrIndex + 1);
+        LCurrIndex = LNewIndex++;
+        if(LNewIndex < AText.Length && AText[LNewIndex] == LRightQuote)
+          LCurrIndex++;
+      }
+    }
+  }
+
   /// Разбивает массив на элементы по делителю
   [SqlFunction(FillRowMethodName = "ArrayToRowSetRow", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, TableDefinition = "[Value] nvarchar(max), [Index] int", IsDeterministic = true)]
   public static IEnumerable ArrayToRowSet(String AText, Char ASeparator)
@@ -161,7 +213,7 @@ public class Arrays
     List<String> LUnique = new List<String>();
 
     StringRowNamed LRow;
-	  LRow.Index = 1;
+    LRow.Index = 1;
     foreach (String LLine in AText.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
     {
       String[] LSubLines = LLine.Split(new char[1]{'='}, 2);
@@ -170,7 +222,7 @@ public class Arrays
       LRow.Name  = LSubLines[0];
       String LName = LRow.Name.ToUpper();
 
-			if (LSubLines.Length == 1 || LSubLines[1] == "")
+      if (LSubLines.Length == 1 || LSubLines[1] == "")
         LRow.Value = null;
       else
         LRow.Value = LSubLines[1];
