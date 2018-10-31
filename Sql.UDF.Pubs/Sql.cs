@@ -440,6 +440,13 @@ public class Sql
     return LResult;
   }
 
+  [SqlFunction(Name = "CastVariantAsText", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static String CastVariantAsText(Object AValue, String AStyle, Char AQuote)
+  {
+    return ValueToText(AValue, (ValueDbStyle)Enum.Parse(typeof(ValueDbStyle), AStyle, true), AQuote);
+  }
+
   /// <summary>
   /// Конвертирует значение параметра из строки
   /// </summary>
