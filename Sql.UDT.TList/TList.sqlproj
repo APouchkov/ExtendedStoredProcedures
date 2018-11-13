@@ -84,6 +84,7 @@
     </Reference>
     <Reference Include="UDF.Pubs.Arrays">
       <HintPath>..\Sql.UDF.Pubs.Arrays\bin\Release\UDF.Pubs.Arrays.dll</HintPath>
+      <Private>False</Private>
     </Reference>
   </ItemGroup>
   <ItemGroup>
