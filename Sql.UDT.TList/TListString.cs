@@ -34,6 +34,25 @@ public class TListString: IBinarySerialize/*, IXmlSerializable*/, INullable
     return LResult.ToString();
   }
 
+  public string ToSQLText()
+  {
+    int LCount = FList.Count;
+    if(LCount == 0)
+      return "";
+
+    StringBuilder LResult = new StringBuilder(LCount);
+    for(int LIndex = 0; LIndex < LCount; LIndex++)
+    { 
+      if(LIndex > 0)
+        LResult.Append(", ");
+      LResult.Append('\'');
+        LResult.Append(FList[LIndex].Replace("'", "''"));
+      LResult.Append('\'');
+    }
+
+    return LResult.ToString();
+  }
+
   public static TListString Null { get { return new TListString(); } }
   public static TListString New() { return Null; }
 

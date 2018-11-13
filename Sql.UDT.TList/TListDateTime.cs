@@ -38,6 +38,34 @@ public class TListDateTime: IBinarySerialize/*, IXmlSerializable*/, INullable
     return LResult.ToString();
   }
 
+  public string ToSQLText()
+  {
+    int LCount = FList.Count;
+    if(LCount == 0)
+      return "";
+
+    StringBuilder LResult = new StringBuilder(LCount);
+    for(int LIndex = 0; LIndex < LCount; LIndex++)
+    { 
+      if(LIndex > 0)
+        LResult.Append(", ");
+
+      LResult.Append('\'');
+        DateTime LValue = FList[LIndex]; 
+        LResult.Append
+        (
+          LValue.Date == LValue ?
+            XmlConvert.ToString(LValue, Sql.XMLDatePattern)
+            :
+            XmlConvert.ToString(LValue, XmlDateTimeSerializationMode.RoundtripKind)
+        );
+      LResult.Append('\'');
+    }
+
+    return LResult.ToString();
+  }
+
+
   public static TListDateTime Null { get { return new TListDateTime(); } }
   public static TListDateTime New() { return Null; }
 

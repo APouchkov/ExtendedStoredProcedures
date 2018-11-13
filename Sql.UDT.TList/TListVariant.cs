@@ -39,6 +39,29 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
     return LResult.ToString();
   }
 
+  public string ToSQLText()
+  {
+    int LCount = FList.Count;
+    if(LCount == 0)
+      return "";
+
+    StringBuilder LResult = new StringBuilder(LCount);
+    for(int LIndex = 0; LIndex < LCount; LIndex++)
+    { 
+      if(LIndex > 0)
+        LResult.Append(", ");
+
+      Object LValue = FList[LIndex];
+      SqlDbType LSqlDbType = Sql.GetSqlType(LValue);
+
+      LResult.Append('\'');
+        LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL).Replace(")", "))"));
+      LResult.Append('\'');
+    }
+
+    return LResult.ToString();
+  }
+
   public static TListVariant Null { get { return new TListVariant(); } }
   public static TListVariant New() { return Null; }
 
