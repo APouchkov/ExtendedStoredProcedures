@@ -53,10 +53,16 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
 
       Object LValue = FList[LIndex];
       SqlDbType LSqlDbType = Sql.GetSqlType(LValue);
+      Boolean LIsQuoteType = Sql.IsQuoteType(LSqlDbType);
 
-      LResult.Append('\'');
+      if (LIsQuoteType)
+      {
+        LResult.Append('\'');
         LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL).Replace(")", "))"));
-      LResult.Append('\'');
+        LResult.Append('\'');
+      }
+      else
+        LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL));
     }
 
     return LResult.ToString();
