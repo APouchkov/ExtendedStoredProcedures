@@ -44,6 +44,21 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
 
   public bool IsNull { get { return false; } }
 
+  public static TListVariant FromTListString(TListString AList, String AType)
+  {
+    if (AList == null) return null;
+
+    SqlDbType     LSqlDbType = Sql.TypeFromString(AType);
+    TListVariant  LResult = TListVariant.New();
+
+    foreach(String LValue in AList.FList)
+    {
+      LResult.FList.Add(Sql.ValueFromString(LValue, LSqlDbType, Sql.ValueDbStyle.SQL));
+    }
+
+    return LResult; 
+  }
+
   public void FromString(String AString)
   {
     if (String.IsNullOrEmpty(AString)) return;
