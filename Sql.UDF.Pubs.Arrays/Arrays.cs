@@ -1,6 +1,7 @@
 ﻿using System;
 using System.IO;
 using System.Data;
+using System.Linq;
 using System.Data.SqlClient;
 using System.Data.SqlTypes;
 using Microsoft.SqlServer.Server;
@@ -124,20 +125,20 @@ public class Arrays
     LMetaCharacters[LMetaCharacters.Length - 1] = ASeparator;
 
     String LTempResult = "";
-    int LCurrIndex = -1;
+    int LPriorIndex = -1;
 
     while(true)
     {
-      int LNewIndex = AText.IndexOfAny(LMetaCharacters, LCurrIndex + 1);
+      int LNewIndex = AText.IndexOfAny(LMetaCharacters, LPriorIndex + 1);
       if(LNewIndex == -1)
       {
-        LTempResult = LTempResult + AText.Substring(LCurrIndex + 1);
+        LTempResult += AText.Substring(LPriorIndex + 1);
         yield return LTempResult;
         yield break;
       }
 
-      LTempResult = LTempResult + AText.Substring(LCurrIndex + 1, LNewIndex - LCurrIndex - 1);
-      LCurrIndex = LNewIndex;
+      LTempResult += AText.Substring(LPriorIndex + 1, LNewIndex - LPriorIndex - 1);
+      LPriorIndex = LNewIndex;
 
       Char LChar = AText[LNewIndex];
       if(LChar == ASeparator)
@@ -148,17 +149,40 @@ public class Arrays
       else
       {
         Char LRightQuote = Strings.InternalGetRightQuote(LChar);
-        LNewIndex = AText.IndexOf(LRightQuote, LCurrIndex + 1);
-        if(LNewIndex == -1)
-          if(AText.Length < 800)
-            throw new System.SystemException("Unclosed quotation at string: " + AText);
-          else
-            throw new System.SystemException("Unclosed quotation at string");
+        Boolean LFirstQuote = (LTempResult.Length == 0);
 
-        LTempResult = LTempResult + AText.Substring(LCurrIndex, LNewIndex - LCurrIndex + 1);
-        LCurrIndex = LNewIndex++;
-        if(LNewIndex < AText.Length && AText[LNewIndex] == LRightQuote)
-          LCurrIndex++;
+        while (true)
+        {
+          // LPriorIndex - индекс последнего элемента, который НАДО УЧЕСТЬ !!!
+          LNewIndex = AText.IndexOf(LRightQuote, LPriorIndex + 1);
+          if (LNewIndex == -1)
+            if (AText.Length < 800)
+              throw new System.SystemException("Unclosed quotation at string: " + AText);
+            else
+              throw new System.SystemException("Unclosed quotation at string");
+
+          // Забираем ВСЁ с первого по текущий элемент.
+          LTempResult += AText.Substring(LPriorIndex, LNewIndex - LPriorIndex + 1);
+          // LPriorIndex пока готовится к выходу из блока квотирования (индекс уже учтённого элемента)
+          LPriorIndex = LNewIndex++;
+
+          if (LNewIndex < AText.Length && AText[LNewIndex] == LRightQuote)
+            // Мы решили остаться, но обе квоты нам уже не нужны
+            LPriorIndex += 2;
+          else
+          {
+            if (LFirstQuote && (LNewIndex == AText.Length || AText[LNewIndex] == ASeparator))
+            {
+              if (LFirstQuote)
+                LTempResult = LTempResult.Substring(1, LTempResult.Length - 2);
+
+              yield return LTempResult;
+              LTempResult = "";
+              LPriorIndex++;
+            }
+            break;
+          }
+        }
       }
     }
   }
@@ -612,7 +636,7 @@ public class Arrays
   }
   
   [SqlFunction(Name = "ArrayTest", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
-  public static SqlInt64 ArrayTest(String AArray1, String AArray2, Char ASeparator)
+  public static Int64 ArrayTest(String AArray1, String AArray2, Char ASeparator)
   {
     //String
     //  LArray1      = (AArray1.IsNull ? null : AArray1.Value),
@@ -622,7 +646,7 @@ public class Arrays
   }
 
   [SqlFunction(Name = "ArrayTestNonDeterministic", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = false)]
-  public static SqlInt64 ArrayTestNonDeterministic(String AArray1, String AArray2, Char ASeparator)
+  public static Int64 ArrayTestNonDeterministic(String AArray1, String AArray2, Char ASeparator)
   {
     //String
     //  LArray1      = (AArray1.IsNull ? null : AArray1.Value),
@@ -757,7 +781,7 @@ public class Arrays
   }
 
 	[SqlFunction(Name = "Arrays Fully Included", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
-  public static SqlBoolean ArraysFullyIncluded(String AArray, String ASubArray, Char ASeparator)
+  public static Boolean ArraysFullyIncluded(String AArray, String ASubArray, Char ASeparator)
   {
     //String
     //  LArray      = (AArray.IsNull ? null : AArray.Value),
@@ -770,9 +794,9 @@ public class Arrays
       return false;
 
     if (AArray.Equals("*"))
-      return new SqlBoolean(true);
+      return true;
     if (ASubArray.Equals("*"))
-      return new SqlBoolean(false);
+      return false;
 
     AArray = ASeparator + AArray + ASeparator;
     foreach(String LItem in ASubArray.Split(new char[]{ASeparator}, StringSplitOptions.RemoveEmptyEntries))
@@ -782,6 +806,16 @@ public class Arrays
     }
 
     return true;
+  }
+
+  [SqlFunction(Name = "Array Distinct", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // REUTNS NULL ON NULL INPUT
+  public static String ArrayDistinct(String AArray, Char ASeparator)
+  {
+    if(String.IsNullOrEmpty(AArray))
+      return AArray;
+
+    return String.Join(ASeparator.ToString(), AArray.Split(new Char[] { ASeparator }).Distinct());
   }
 }
 
