@@ -24,15 +24,19 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
       return "";
 
     StringBuilder LResult = new StringBuilder(LCount);
+    SqlDbType LSqlDbType;
+    Sql.StringSerializationMethod LsqlSerializationMethod;
     for(int LIndex = 0; LIndex < LCount; LIndex++)
     { 
       if(LIndex > 0)
         LResult.Append(',');
+
       Object LValue = FList[LIndex];
-      SqlDbType LSqlDbType = Sql.GetSqlType(LValue);
+      String SValue = Sql.InternalValueToString(LValue, Sql.ValueDbStyle.XML, out LSqlDbType, out LsqlSerializationMethod);
+
       LResult.Append(LSqlDbType == SqlDbType.NVarChar ? "" : LSqlDbType.ToString());
       LResult.Append('(');
-        LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL).Replace(")", "))"));
+        LResult.Append(LsqlSerializationMethod == Sql.StringSerializationMethod.Quoted ? SValue.Replace(")", "))") : SValue);
       LResult.Append(')');
     }
 
@@ -46,23 +50,31 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
       return "";
 
     StringBuilder LResult = new StringBuilder(LCount);
+    SqlDbType LSqlDbType;
+    Sql.StringSerializationMethod LsqlSerializationMethod;
+
     for(int LIndex = 0; LIndex < LCount; LIndex++)
     { 
       if(LIndex > 0)
         LResult.Append(", ");
 
       Object LValue = FList[LIndex];
-      SqlDbType LSqlDbType = Sql.GetSqlType(LValue);
-      Boolean LIsQuoteType = Sql.IsQuoteType(LSqlDbType);
-
-      if (LIsQuoteType)
+      String SValue = Sql.InternalValueToString(LValue, Sql.ValueDbStyle.SQL, out LSqlDbType, out LsqlSerializationMethod);
+      switch(LsqlSerializationMethod)
       {
-        LResult.Append('\'');
-        LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL).Replace(")", "))"));
-        LResult.Append('\'');
+        case Sql.StringSerializationMethod.Quoted:
+          LResult.Append('\'');
+            LResult.Append(SValue);
+          LResult.Append('\'');
+          break;
+        case Sql.StringSerializationMethod.BinaryHex:
+          LResult.Append("0x");
+          LResult.Append(SValue);
+          break;
+        default:
+          LResult.Append(SValue);
+          break;
       }
-      else
-        LResult.Append(Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL));
     }
 
     return LResult.ToString();
@@ -148,9 +160,11 @@ public class TListVariant: IBinarySerialize/*, IXmlSerializable*/, INullable
   {
     if(AValue == null || AValue.FList.Count == 0)
       return true;
+
     for(int i = AValue.FList.Count - 1; i >= 0; i--)
       if(!FList.Contains(AValue.FList[i]))
         return false;
+
     return true;
   }
 

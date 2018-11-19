@@ -28,7 +28,15 @@ public class TListString: IBinarySerialize/*, IXmlSerializable*/, INullable
     { 
       if(LIndex > 0)
         LResult.Append(',');
-      LResult.Append(FList[LIndex].ToString());
+      String LValue =  FList[LIndex];
+      if(LValue.LastIndexOf(',') != -1)
+      {
+        LResult.Append('[');
+          LResult.Append(LValue.Replace("]", "]]"));
+        LResult.Append(']');
+      }
+      else
+        LResult.Append(LValue);
     }
 
     return LResult.ToString();
@@ -62,8 +70,9 @@ public class TListString: IBinarySerialize/*, IXmlSerializable*/, INullable
   {
     if (String.IsNullOrEmpty(AString)) return;
 
-    foreach (string LItem in AString.Split(','))
-      FList.Add(LItem);
+//    foreach (String LItem in AString.Split(','))
+    foreach (Object LObject in Arrays.SplitString(AString, ',', new char[] {'['}))
+      FList.Add((String)LObject);
   }
 
   [
