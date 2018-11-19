@@ -678,11 +678,11 @@ out SqlXml AXml,
         else if(Parser.Current.Value[0] == '$')
         {
           String LValues = (Parser.Current.Value.Length == 1 ? AParams.CastAsString() : AParams.CastAsStringCustom(Parser.Current.Value.Substring(1)));
-          Result.Append(LValues == null ? "NULL" : Strings.QuoteString(LValues));
+          Result.Append(LValues == null ? "NULL" : Strings.QuoteStringSQL(LValues));
         }
         else if(AParams.TryGetValue(Parser.Current.Value, out LParamValue))
         {
-          Result.Append(Sql.ValueToText(LParamValue, Sql.ValueDbStyle.SQL, '\''));
+          Result.Append(Sql.ValueToSQLText(LParamValue, '\''));
         }
         else
           Result.Append("NULL");
