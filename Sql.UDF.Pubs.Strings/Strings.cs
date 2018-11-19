@@ -48,6 +48,53 @@ public class Strings
     return Convert.ToBase64String(ABinary.Value);
   }
 
+  public static void BytesToHex(byte[] ABytes, StringBuilder AResult, int AStartIndex = 0, int ACount = -1)
+  {
+    int LEndIndex;
+    if(ACount == -1)
+      LEndIndex = ABytes.Length - AStartIndex;
+    else
+      LEndIndex = AStartIndex + ACount;
+    
+    int LByteBuffer;
+    for(int i = AStartIndex; i < LEndIndex; i++)
+    {
+      byte LByte = ABytes[i];
+      LByteBuffer = LByte >> 4; AResult.Append((char)(55 + LByteBuffer + (((LByteBuffer - 10) >> 31) & -7)));
+      LByteBuffer = LByte & 0xF; AResult.Append((char)(55 + LByteBuffer + (((LByteBuffer - 10) >> 31) & -7)));
+    }
+  }
+
+  [SqlFunction(Name = "Convert Binary::To Hex", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String ConvertBinaryToHex(SqlBinary ABinary)
+  {
+    StringBuilder LResult = new StringBuilder(ABinary.Length * 2);
+    BytesToHex(ABinary.Value, LResult);
+    return LResult.ToString();
+  }
+
+  [SqlFunction(Name = "Convert Binary::To Hex(Splited)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String ConvertBinaryToHexSplited(SqlBinary ABinary, Int16 ALineBytes, String ASeparator)
+  {
+    //String SValue = BitConverter.ToString(ABinary.Value);
+    byte[] LBinary = ABinary.Value;
+    int LLength = LBinary.Length;
+    int LLines  = (LLength + ALineBytes - 1) / ALineBytes;
+    StringBuilder LResult = new StringBuilder(LLength * 2 + ASeparator.Length * (LLines - 1));
+
+    for(int i = 0; i < LLines; i++)
+    {
+      if(i > 0)
+        LResult.Append(ASeparator);
+
+      BytesToHex(LBinary, LResult, i * ALineBytes, ALineBytes);
+      //LResult.Append(BitConverter.ToString(ABinary.Value, i * ALineBytes, ALineBytes));
+    }
+    return LResult.ToString();
+  }
+
   [SqlFunction(Name = "Trim Left", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String TrimLeft(String AValue, Char[] ASymbols)
@@ -165,6 +212,16 @@ public class Strings
     return AValue;
   }
 
+  [SqlFunction(Name = "QuoteIfNeeded(Ex)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // RETURNS NULL ON NULL INPUT
+  public static String QuoteIfNeededEx(String AValue, Char AQuote, char[] AExtraChars)
+  {
+    Char RQuote = InternalGetRightQuote(AQuote);
+    if((AValue.IndexOf(AQuote) >= 0) || (AValue.IndexOfAny(AExtraChars) >= 0))
+      return AQuote + AValue.Replace(new String(RQuote, 1), new String(RQuote, 2)) + RQuote;
+    return AValue;
+  }
+
   [SqlFunction(Name = "Deep Quote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String DeepQuote(String AValue, Char AQuote, Byte ADepth)
@@ -189,28 +246,28 @@ public class Strings
     }
   }
 
-  [SqlFunction(Name = "Quote String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "String@Quote?SQL", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
-  public static String QuoteString(String AValue)
+  public static String QuoteStringSQL(String AValue)
   {
     return Quote(AValue, '\'');
   }
 
-  [SqlFunction(Name = "Quote String(If Needed)", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "String@Quote(If Needed)?SQL", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
-  public static String QuoteStringIfNeeded(String AValue)
+  public static String QuoteStringSQLIfNeeded(String AValue)
   {
     return QuoteIfNeeded(AValue, '\'');
   }
 
-  [SqlFunction(Name = "Deep Quote String", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "String@Deep Quote?SQL", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
-  public static String DeepQuoteString(String AValue, Byte ADepth)
+  public static String DeepQuoteStringSQL(String AValue, Byte ADepth)
   {
     return DeepQuote(AValue, '\'', ADepth);
   }
 
-  [SqlFunction(Name = "UnQuote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  [SqlFunction(Name = "String@UnQuote", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // RETURNS NULL ON NULL INPUT
   public static String UnQuote(String AValue, Char[] AQuotes)
   {
@@ -291,6 +348,7 @@ public class Concat: IBinarySerialize
       FResult.Append(FSeparator);
 
     FResult.Append(AOther.FResult);
+    FEmpty = false;
   }
 
   public String Terminate()
