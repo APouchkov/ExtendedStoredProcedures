@@ -89,25 +89,27 @@ namespace INT
 
     private void AppendToStringEx(String AName, Object AValue, String AListSeparator, StringBuilder AResult)
     {
-      SqlDbType LSqlDbType = Sql.GetSqlType(AValue);
+      SqlDbType LSqlDbType;
+      Sql.StringSerializationMethod LSerializationMethod;
+
       if(AResult.Length > 0)
         AResult.Append(AListSeparator);
 
+      AResult.Append(EncodeName(AName));
+      String SValue = Sql.InternalValueToString(AValue, Sql.ValueDbStyle.XML, out LSqlDbType, out LSerializationMethod);
+      if (LSqlDbType != SqlDbType.NVarChar)
+      {
+        AResult.Append(':');
+        AResult.Append(LSqlDbType == SqlDbType.Udt ? ((SqlUdt)AValue).TypeName : LSqlDbType.ToString());
+      }
+
       AResult.Append
       (
-        String.Format
-        (
-          "{0}{1}={2}", 
-          EncodeName(AName),
-          LSqlDbType == SqlDbType.NVarChar ?
-            ""
-            :
-            (":" + (LSqlDbType == SqlDbType.Udt ? ((SqlUdt)AValue).TypeName : LSqlDbType.ToString())),
-              Sql.IsQuoteType(LSqlDbType) ?
-                Strings.Quote(Sql.ValueToString(AValue, Sql.ValueDbStyle.SQL), '"')
-                :
-                Sql.ValueToString(AValue, Sql.ValueDbStyle.SQL))
-        );
+        LSerializationMethod == Sql.StringSerializationMethod.Quoted ?
+          Strings.Quote(SValue, '"')
+          :
+          SValue
+      );
     }
 
     /// <summary>
@@ -269,7 +271,7 @@ namespace INT
             if (LSqlDbType == SqlDbType.Udt)
               LValue = new SqlUdt(Parser.Current.CastAs, SValue);
             else
-              LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.SQL);
+              LValue = Sql.ValueFromString(SValue, LSqlDbType, Sql.ValueDbStyle.XML);
             AddParam(LName, LValue);
           }
 
@@ -321,8 +323,12 @@ namespace INT
     /// <returns>Значение параметра типа Bit</returns>
     private static SqlBoolean AsBit(Object AValue)
     {
-      if (AValue is SqlBoolean) return (SqlBoolean)AValue;
-      else return SqlBoolean.Parse(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text));
+      if (AValue is SqlBoolean)
+        return (SqlBoolean)AValue;
+      else
+      {
+        return SqlBoolean.Parse(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text));
+      }
     }
     protected SqlBoolean AsBit(String AName)
     {
@@ -369,9 +375,14 @@ namespace INT
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return SqlString.Null;
 
-      if (LValue is SqlString) return (SqlString)LValue;
-      else if (LValue is SqlChars) return ((SqlChars)LValue).ToSqlString();
-      else return (SqlString)Sql.ValueToString(LValue, Sql.ValueDbStyle.Text);
+      if (LValue is SqlString)
+        return (SqlString)LValue;
+      else if (LValue is SqlChars)
+        return ((SqlChars)LValue).ToSqlString();
+      else
+      {
+        return (SqlString)Sql.ValueToString(LValue, Sql.ValueDbStyle.Text);
+      }
     }
 
     protected SqlChars AsSqlChars(String AName)
@@ -379,9 +390,14 @@ namespace INT
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return SqlChars.Null;
 
-      if (LValue is SqlChars) return (SqlChars)LValue;
-      else if (LValue is SqlString) return new SqlChars((SqlString)LValue);
-      else return new SqlChars(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text));
+      if (LValue is SqlChars)
+        return (SqlChars)LValue;
+      else if (LValue is SqlString)
+        return new SqlChars((SqlString)LValue);
+      else
+      {
+        return new SqlChars(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text));
+      }
     }
 
     public static SqlString AsSqlString(TParams AParams, String AName)
@@ -401,7 +417,9 @@ namespace INT
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return SqlString.Null;
 
-      if (LValue is SqlString) return (SqlString)LValue;
+      if (LValue is SqlString) 
+        return (SqlString)LValue;
+
       return (SqlString)Sql.ValueToString(LValue, Sql.ValueDbStyle.SQL);
     }
 
@@ -415,7 +433,7 @@ namespace INT
       Object LValue;
       if (!FData.TryGetValue(AName, out LValue)) return "NULL";
 
-      return (SqlString)Sql.ValueToText(LValue, Sql.ValueDbStyle.SQL, '\'');
+      return (SqlString)Sql.ValueToSQLText(LValue, '\'');
     }
 
     /// <summary>
@@ -434,7 +452,10 @@ namespace INT
         if (LValue is DateTime) return ((DateTime)LValue).TimeOfDay;
         if (LValue is DateTimeOffset) return ((DateTimeOffset)LValue).TimeOfDay;
         if (LValue is SqlDateTime) return ((DateTime)(SqlDateTime)LValue).TimeOfDay;
-        else return TimeSpan.Parse(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text));
+        else
+        {
+          return TimeSpan.Parse(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text));
+        }
       }
       catch
       {
@@ -457,7 +478,10 @@ namespace INT
         if (LValue is DateTime) return ((DateTime)LValue).Date;
         if (LValue is DateTimeOffset) return ((DateTimeOffset)LValue).Date;
         if (LValue is SqlDateTime) return ((SqlDateTime)LValue).Value.Date;
-        else return ((DateTime)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.Date, Sql.ValueDbStyle.Text)).Date;
+        else
+        {
+          return ((DateTime)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.Date, Sql.ValueDbStyle.Text)).Date;
+        }
       }
       catch
       {
@@ -479,7 +503,10 @@ namespace INT
       {
         if (LValue is DateTime || LValue is SqlDateTime) return (SqlDateTime)LValue;
         if (LValue is DateTimeOffset) return (SqlDateTime)((DateTimeOffset)LValue).DateTime;
-        else return (SqlDateTime)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.DateTime, Sql.ValueDbStyle.Text);
+        else
+        {
+          return (SqlDateTime)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.DateTime, Sql.ValueDbStyle.Text);
+        }
       }
       catch
       {
@@ -498,7 +525,10 @@ namespace INT
       if (AValue is SqlDateTime) return ((SqlDateTime)AValue).Value;
       if (AValue is TimeSpan) return new DateTime(((TimeSpan)AValue).Ticks, DateTimeKind.Utc);
       if (AValue is DateTimeOffset) return ((DateTimeOffset)AValue).DateTime;
-      else return (DateTime)Sql.ValueFromString(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text), SqlDbType.DateTime, Sql.ValueDbStyle.Text);
+      else
+      {
+        return (DateTime)Sql.ValueFromString(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text), SqlDbType.DateTime, Sql.ValueDbStyle.Text);
+      }
     }
 
     protected DateTime? AsDateTime2(String AName)
@@ -527,7 +557,10 @@ namespace INT
       if (AValue is DateTime) return new DateTimeOffset((DateTime)AValue, TimeSpan.Zero);
       if (AValue is SqlDateTime) return new DateTimeOffset(((SqlDateTime)AValue).Value, TimeSpan.Zero);
       if (AValue is TimeSpan) return new DateTimeOffset(((TimeSpan)AValue).Ticks, TimeSpan.Zero);
-      else return (DateTimeOffset)Sql.ValueFromString(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text), SqlDbType.DateTimeOffset, Sql.ValueDbStyle.Text);
+      else
+      {
+        return (DateTimeOffset)Sql.ValueFromString(Sql.ValueToString(AValue, Sql.ValueDbStyle.Text), SqlDbType.DateTimeOffset, Sql.ValueDbStyle.Text);
+      }
     }
 
     protected DateTimeOffset? AsDateTimeOffset(String AName)
@@ -566,8 +599,11 @@ namespace INT
         if (LValue is SqlDecimal) return ((SqlDecimal)LValue).ToSqlByte();
         if (LValue is SqlDouble)  return ((SqlDouble)LValue).ToSqlByte();
         if (LValue is SqlMoney)   return ((SqlMoney)LValue).ToSqlByte();
-        if (LValue is SqlSingle)  return ((SqlSingle)LValue).ToSqlByte();
-        else return (SqlByte)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.TinyInt, Sql.ValueDbStyle.Text);
+        if (LValue is SqlSingle) return ((SqlSingle)LValue).ToSqlByte();
+        else
+        {
+          return (SqlByte)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.TinyInt, Sql.ValueDbStyle.Text);
+        }
       }
       catch
       {
@@ -596,8 +632,11 @@ namespace INT
         if (LValue is SqlDecimal)  return ((SqlDecimal)LValue).ToSqlInt16();
         if (LValue is SqlDouble)   return ((SqlDouble)LValue).ToSqlInt16();
         if (LValue is SqlMoney)    return ((SqlMoney)LValue).ToSqlInt16();
-        if (LValue is SqlSingle)   return ((SqlSingle)LValue).ToSqlInt16();
-        else return (SqlInt16)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.SmallInt, Sql.ValueDbStyle.Text);
+        if (LValue is SqlSingle) return ((SqlSingle)LValue).ToSqlInt16();
+        else
+        {
+          return (SqlInt16)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.SmallInt, Sql.ValueDbStyle.Text);
+        }
       }
       catch
       {
@@ -626,8 +665,11 @@ namespace INT
         if (LValue is SqlDecimal)  return ((SqlDecimal)LValue).ToSqlInt32();
         if (LValue is SqlDouble)   return ((SqlDouble)LValue).ToSqlInt32();
         if (LValue is SqlMoney)    return ((SqlMoney)LValue).ToSqlInt32();
-        if (LValue is SqlSingle)   return ((SqlSingle)LValue).ToSqlInt32();
-        else return (SqlInt32)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.Int, Sql.ValueDbStyle.Text);
+        if (LValue is SqlSingle) return ((SqlSingle)LValue).ToSqlInt32();
+        else
+        {
+          return (SqlInt32)Sql.ValueFromString(Sql.ValueToString(LValue, Sql.ValueDbStyle.Text), SqlDbType.Int, Sql.ValueDbStyle.Text);
+        }
       }
       catch
       {
