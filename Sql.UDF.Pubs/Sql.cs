@@ -210,11 +210,22 @@ public class Sql
     XMLDatePattern,                           XMLDateTimePattern, XMLDateTimeOffsetPattern, XMLDateTimeZeroOffsetPattern
   };
 
-  public static bool IsQuoteType(SqlDbType type)
+  public enum StringSerializationMethod
   {
-    switch (type)
+    Default       = 0,
+    Quoted        = 1,
+    BinaryHex     = 2,
+    BinaryBase64  = 3
+  }
+  /// <summary>
+  /// Возвращает предпочтительный способ сериализации данных в SQL-тексте
+  /// </summary>
+  /// <param name="type">Тип данных, заданный в SqlDbType</param>
+  /// <returns>Способ сериализации в StringSerializationMethod</returns>
+  public static StringSerializationMethod GetSQLSerializationMethod(SqlDbType AType)
+  {
+    switch (AType)
     {
-      case SqlDbType.VarBinary:
       case SqlDbType.Char:
       case SqlDbType.VarChar:
       case SqlDbType.NChar:
@@ -227,13 +238,60 @@ public class Sql
       case SqlDbType.Time:
       case SqlDbType.DateTimeOffset:
       case SqlDbType.UniqueIdentifier:
-      case SqlDbType.Udt:
-        return true;
+      case SqlDbType.Xml:
+      case SqlDbType.Text:
+      case SqlDbType.NText:
+        return StringSerializationMethod.Quoted;
 
+      case SqlDbType.Bit:
+      case SqlDbType.TinyInt:
+      case SqlDbType.SmallInt:
+      case SqlDbType.Int:
+      case SqlDbType.BigInt:
+      case SqlDbType.Decimal:
+      case SqlDbType.Float:
+      case SqlDbType.Money:
+      case SqlDbType.Real:
+      case SqlDbType.SmallMoney:
+        return StringSerializationMethod.Default;
+
+      //case SqlDbType.Binary:
+      //case SqlDbType.VarBinary:
+      //case SqlDbType.Timestamp:
+      //case SqlDbType.Image:
+      //case SqlDbType.Udt:
       default:
-        return false;
+        return StringSerializationMethod.BinaryHex;
     }
   }
+
+  /// <summary>
+  /// Возвращает признак необходимости квотирования данных при сериализации в (N)VarChar
+  /// </summary>
+  /// <param name="type">Тип данных, заданный в SqlDbType</param>
+  /// <returns>Да/Нет</returns>
+  //public static Boolean IsQuoteType(SqlDbType type)
+  //{
+  //  switch (type)
+  //  {
+  //    case SqlDbType.Bit:
+  //    case SqlDbType.TinyInt:
+  //    case SqlDbType.SmallInt:
+  //    case SqlDbType.Int:
+  //    case SqlDbType.BigInt:
+
+  //    case SqlDbType.Decimal:
+  //    case SqlDbType.Float:
+  //    case SqlDbType.Money:
+  //    case SqlDbType.Real:
+  //    case SqlDbType.SmallMoney:
+  //    //case SqlDbType.Timestamp:
+  //      return false;
+
+  //    default:
+  //      return true;
+  //  }
+  //}
 
   /// <summary>
   /// Конвертирует тип значения параметра из строки в SqlDbType
@@ -329,96 +387,149 @@ public class Sql
   /// <summary>
   /// Конвертирует значение параметра в строку
   /// </summary>
-  public static String ValueToString(Object value, ValueDbStyle style)
+  public static String InternalValueToString(Object AValue, ValueDbStyle AStyle, out SqlDbType AType, out StringSerializationMethod AStringSerializationMethod)
   {
-    SqlDbType type = GetSqlType(value);
-    switch (type)
+    AType = GetSqlType(AValue);
+
+    AStringSerializationMethod = StringSerializationMethod.Default;
+    switch (AType)
     {
-      case SqlDbType.Bit            : return ((SqlBoolean)value).IsTrue ? "1" : "0";
-      case SqlDbType.TinyInt        : return XmlConvert.ToString((Byte)(SqlByte)value);
-      case SqlDbType.SmallInt       : return XmlConvert.ToString((Int16)(SqlInt16)value);
-      case SqlDbType.Int            : return XmlConvert.ToString((Int32)(SqlInt32)value);
-      case SqlDbType.BigInt         : return XmlConvert.ToString((Int64)(SqlInt64)value);
+      case SqlDbType.Bit: return ((SqlBoolean)AValue).IsTrue ? "1" : "0";
+      case SqlDbType.TinyInt: return XmlConvert.ToString((Byte)(SqlByte)AValue);
+      case SqlDbType.SmallInt: return XmlConvert.ToString((Int16)(SqlInt16)AValue);
+      case SqlDbType.Int: return XmlConvert.ToString((Int32)(SqlInt32)AValue);
+      case SqlDbType.BigInt: return XmlConvert.ToString((Int64)(SqlInt64)AValue);
 
-      case SqlDbType.Char           :
-      case SqlDbType.VarChar        :
-          //return ((SqlAnsiString)value).ToString();
-      case SqlDbType.NChar          :
-      case SqlDbType.NVarChar       :
-        if(value is SqlChars)
-          return (String)((SqlChars)value).ToSqlString().Value;
-        else
-          return (String)(SqlString)value;
-
-      case SqlDbType.Binary         :
-      case SqlDbType.VarBinary      : return (value is SqlBinary) ?
-                                        Convert.ToBase64String(((SqlBinary)value).Value, Base64FormattingOptions.None)
-                                        :
-                                        Convert.ToBase64String(((SqlBytes)value).Value, Base64FormattingOptions.None);
-
-      case SqlDbType.DateTime       : return (style == ValueDbStyle.XML) ?
-                                        XmlConvert.ToString((DateTime)(SqlDateTime)value, XmlDateTimeSerializationMode.RoundtripKind)
-                                        :
-                                        (style == ValueDbStyle.SQL) ?
-                                          ((DateTime)(SqlDateTime)value).ToString(SQLDateTimePattern, CultureInfo.InvariantCulture)
-                                          :
-                                          ((DateTime)(SqlDateTime)value).ToString(TextDateTimePattern, CultureInfo.InvariantCulture);
-      case SqlDbType.Date           : return (style == ValueDbStyle.XML) ?
-                                        XmlConvert.ToString((DateTime)value, XMLDatePattern)
-                                        :
-                                        (style == ValueDbStyle.SQL)?
-                                          ((DateTime)value).ToString(SQLDatePattern, CultureInfo.InvariantCulture)
-                                          :
-                                          ((DateTime)value).ToString(TextDatePattern, CultureInfo.InvariantCulture);
-      case SqlDbType.DateTime2      : return (style == ValueDbStyle.XML)?
-                                        XmlConvert.ToString((DateTime)value, XmlDateTimeSerializationMode.RoundtripKind)
-                                        :
-                                        (style == ValueDbStyle.SQL)?
-                                          ((DateTime)value).ToString(SQLDateTimePattern, CultureInfo.InvariantCulture)
-                                          :
-                                          ((DateTime)value).ToString(TextDateTimePattern, CultureInfo.InvariantCulture);
-      case SqlDbType.SmallDateTime  : return (style == ValueDbStyle.XML)?
-                                        XmlConvert.ToString((DateTime)value, XmlDateTimeSerializationMode.RoundtripKind)
-                                        :
-                                        (style == ValueDbStyle.SQL)?
-                                          ((DateTime)value).ToString(TextSmallDateTimePattern, CultureInfo.InvariantCulture)
-                                          :
-                                          ((DateTime)value).ToString(SQLSmallDateTimePattern, CultureInfo.InvariantCulture);
-      case SqlDbType.DateTimeOffset : return (style == ValueDbStyle.XML)?
-                                        XmlConvert.ToString((DateTimeOffset)value)
-                                        :
-                                        (style == ValueDbStyle.SQL) ?
-                                          ((DateTimeOffset)value).ToString(SQLDateTimeOffsetPattern, CultureInfo.InvariantCulture)
-                                          :
-                                          ((DateTimeOffset)value).ToString(TextDateTimeOffsetPattern, CultureInfo.InvariantCulture);
-      case SqlDbType.Time: return Convert.ToString((TimeSpan)value);
-
-      //case SqlDbType.Date: return ((DateTime)value).ToString(CultureInfo.DateTimeFormat.ShortDatePattern, CultureInfo);
-      //case SqlDbType.DateTime: return Convert.ToString((DateTime)(SqlDateTime)value, CultureInfo);
-      //case SqlDbType.SmallDateTime: return Convert.ToString((DateTime)(SqlDateTime)value, CultureInfo);
-      //case SqlDbType.DateTime2: return Convert.ToString((DateTime)value, CultureInfo);
-      //case SqlDbType.Time: return Convert.ToString((TimeSpan)value, CultureInfo);
-      //case SqlDbType.DateTimeOffset: return Convert.ToString((DateTimeOffset)value, CultureInfo);
-
-      case SqlDbType.Float          : return XmlConvert.ToString((Double)(SqlDouble)value);
-      case SqlDbType.Real           : return XmlConvert.ToString((Double)(SqlSingle)value);
-      case SqlDbType.SmallMoney     : return XmlConvert.ToString((Decimal)(SqlMoney)value);
-      case SqlDbType.Money          : return XmlConvert.ToString((Decimal)(SqlMoney)value);
-      case SqlDbType.Decimal        : return XmlConvert.ToString((Decimal)(SqlDecimal)value);
-
-      case SqlDbType.UniqueIdentifier : return XmlConvert.ToString((Guid)(SqlGuid)value).ToUpper();
-
-      case SqlDbType.Xml              : return ((SqlXml)value).Value;
-      case SqlDbType.Udt              : return value.ToString();
-
-      // Not support SqlDbType.Image
-      // Not support SqlDbType.NText
-      // Not support SqlDbType.Structured
-      // Not support SqlDbType.Text
-      // Not support SqlDbType.Timestamp
-      // Not support SqlDbType.Variant
+      case SqlDbType.Float: return XmlConvert.ToString((Double)(SqlDouble)AValue);
+      case SqlDbType.Real: return XmlConvert.ToString((Double)(SqlSingle)AValue);
+      case SqlDbType.SmallMoney: return XmlConvert.ToString((Decimal)(SqlMoney)AValue);
+      case SqlDbType.Money: return XmlConvert.ToString((Decimal)(SqlMoney)AValue);
+      case SqlDbType.Decimal: return XmlConvert.ToString((Decimal)(SqlDecimal)AValue);
     }
+    //case SqlDbType.Timestamp:
+    //case SqlDbType.Image:
+
+    AStringSerializationMethod = StringSerializationMethod.Quoted;
+    switch (AType)
+    {
+      case SqlDbType.DateTime:
+        return (AStyle == ValueDbStyle.XML) ?
+          XmlConvert.ToString((DateTime)(SqlDateTime)AValue, XmlDateTimeSerializationMode.RoundtripKind)
+          :
+          (AStyle == ValueDbStyle.SQL) ?
+            ((DateTime)(SqlDateTime)AValue).ToString(SQLDateTimePattern, CultureInfo.InvariantCulture)
+            :
+            ((DateTime)(SqlDateTime)AValue).ToString(TextDateTimePattern, CultureInfo.InvariantCulture);
+      case SqlDbType.Date:
+        return (AStyle == ValueDbStyle.XML) ?
+          XmlConvert.ToString((DateTime)AValue, XMLDatePattern)
+          :
+          (AStyle == ValueDbStyle.SQL) ?
+            ((DateTime)AValue).ToString(SQLDatePattern, CultureInfo.InvariantCulture)
+            :
+            ((DateTime)AValue).ToString(TextDatePattern, CultureInfo.InvariantCulture);
+      case SqlDbType.DateTime2:
+        return (AStyle == ValueDbStyle.XML) ?
+          XmlConvert.ToString((DateTime)AValue, XmlDateTimeSerializationMode.RoundtripKind)
+          :
+          (AStyle == ValueDbStyle.SQL) ?
+            ((DateTime)AValue).ToString(SQLDateTimePattern, CultureInfo.InvariantCulture)
+            :
+            ((DateTime)AValue).ToString(TextDateTimePattern, CultureInfo.InvariantCulture);
+      case SqlDbType.SmallDateTime:
+        return (AStyle == ValueDbStyle.XML) ?
+          XmlConvert.ToString((DateTime)AValue, XmlDateTimeSerializationMode.RoundtripKind)
+          :
+          (AStyle == ValueDbStyle.SQL) ?
+            ((DateTime)AValue).ToString(TextSmallDateTimePattern, CultureInfo.InvariantCulture)
+            :
+            ((DateTime)AValue).ToString(SQLSmallDateTimePattern, CultureInfo.InvariantCulture);
+      case SqlDbType.DateTimeOffset:
+        return (AStyle == ValueDbStyle.XML) ?
+          XmlConvert.ToString((DateTimeOffset)AValue)
+          :
+          (AStyle == ValueDbStyle.SQL) ?
+            ((DateTimeOffset)AValue).ToString(SQLDateTimeOffsetPattern, CultureInfo.InvariantCulture)
+            :
+            ((DateTimeOffset)AValue).ToString(TextDateTimeOffsetPattern, CultureInfo.InvariantCulture);
+      case SqlDbType.Time: return Convert.ToString((TimeSpan)AValue);
+
+      case SqlDbType.UniqueIdentifier: return XmlConvert.ToString((Guid)(SqlGuid)AValue).ToUpper();
+    }
+
+    switch (AType)
+    {
+      case SqlDbType.Char:
+      case SqlDbType.VarChar:
+      //return ((SqlAnsiString)AValue).ToString();
+      case SqlDbType.NChar:
+      case SqlDbType.NVarChar:
+        if (AValue is SqlChars)
+          return (String)((SqlChars)AValue).ToSqlString().Value;
+        else
+          return (String)(SqlString)AValue;
+
+      case SqlDbType.Xml: return ((SqlXml)AValue).Value;
+    }
+
+    switch (AType)
+    {
+      case SqlDbType.Binary         :
+      case SqlDbType.VarBinary      :
+                                      byte[] LBytes =
+                                        (AValue is SqlBinary) ?
+                                          ((SqlBinary)AValue).Value
+                                          :
+                                          ((SqlBytes)AValue).Value;
+
+                                      if (AStyle == ValueDbStyle.XML)
+                                      {
+                                        AStringSerializationMethod = StringSerializationMethod.BinaryBase64;
+                                        return Convert.ToBase64String(LBytes, Base64FormattingOptions.None);
+                                      }
+
+                                      AStringSerializationMethod = StringSerializationMethod.BinaryHex;
+
+                                      StringBuilder LResult = new StringBuilder(LBytes.Length * 2);
+                                      Strings.BytesToHex(LBytes, LResult);
+                                      return LResult.ToString();
+
+      case SqlDbType.Udt              :
+        if (AStyle != ValueDbStyle.SQL)
+        {
+          AStringSerializationMethod = StringSerializationMethod.Quoted;
+          return AValue.ToString();
+        }
+
+        AStringSerializationMethod = StringSerializationMethod.BinaryHex;
+        
+        System.IO.MemoryStream s = new System.IO.MemoryStream();
+        System.IO.BinaryWriter w = new System.IO.BinaryWriter(s);
+        (AValue as IBinarySerialize).Write(w);
+        byte[] LUdtBytes = s.ToArray();
+
+        StringBuilder LUdtResult = new StringBuilder(LUdtBytes.Length * 2);
+        Strings.BytesToHex(LUdtBytes, LUdtResult);
+
+        return LUdtResult.ToString();
+    }
+
+    // Not support SqlDbType.Image
+    // Not support SqlDbType.NText
+    // Not support SqlDbType.Structured
+    // Not support SqlDbType.Text
+    // Not support SqlDbType.Timestamp
+    // Not support SqlDbType.Variant
+
     throw new Exception("Системная ошибка"); // Сюда никогда не должно попасть
+  }
+
+  public static String ValueToString(Object AValue, ValueDbStyle AStyle)
+  {
+    SqlDbType LSqlDbType;
+    Sql.StringSerializationMethod LSerializationMethod;
+
+    return InternalValueToString(AValue, AStyle, out LSqlDbType, out LSerializationMethod);
   }
 
   [SqlFunction(Name = "CastVariantAsString", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
@@ -430,22 +541,53 @@ public class Sql
 
 
   /// <summary>
-  /// Конвертирует значение параметра в текст
+  /// Конвертирует значение параметра в SQL-текст
   /// </summary>
-  public static String ValueToText(Object AValue, ValueDbStyle AStyle, Char AQuote)
+  [SqlFunction(Name = "CastVariantAsSQLText", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  // WITH RETURNS NULL ON NULL INPUT
+  public static String ValueToSQLText(Object AValue, Char AQuote)
   {
-    String LResult = ValueToString(AValue, AStyle);
-    if (IsQuoteType(GetSqlType(AValue)))
-      LResult = Strings.Quote(LResult, AQuote);
+    SqlDbType LType;
+    StringSerializationMethod LsqlSerializationMethod;
+    String LResult = InternalValueToString(AValue, ValueDbStyle.SQL, out LType, out LsqlSerializationMethod);
+
+    switch (LsqlSerializationMethod)
+    {
+      case StringSerializationMethod.Quoted:
+        return Strings.Quote(LResult, AQuote);
+      case StringSerializationMethod.BinaryHex:
+        return "0x" + LResult;
+    }
+
     return LResult;
   }
 
-  [SqlFunction(Name = "CastVariantAsText", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+/// <summary>
+  /// Конвертирует значение параметра в SQL-текст
+  /// </summary>
+  [SqlFunction(Name = "CastVariantAsCustomText", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
   // WITH RETURNS NULL ON NULL INPUT
-  public static String CastVariantAsText(Object AValue, String AStyle, Char AQuote)
+  public static String ValueToXMLText(Object AValue, Char[] AExtraChars, Char AQuote)
   {
-    return ValueToText(AValue, (ValueDbStyle)Enum.Parse(typeof(ValueDbStyle), AStyle, true), AQuote);
+    SqlDbType LType;
+    StringSerializationMethod LsqlSerializationMethod;
+    String LResult = InternalValueToString(AValue, ValueDbStyle.XML, out LType, out LsqlSerializationMethod);
+
+    if(LResult.IndexOfAny(AExtraChars) != -1)
+        return Strings.Quote(LResult, AQuote);
+
+    return LResult;
   }
+
+  ///// <summary>
+  ///// Конвертирует значение параметра в текст (CLR-Версия)
+  ///// </summary>
+  //[SqlFunction(Name = "CastVariantAsSQLText", DataAccess = DataAccessKind.None, SystemDataAccess = SystemDataAccessKind.None, IsDeterministic = true)]
+  //// WITH RETURNS NULL ON NULL INPUT
+  //public static String CastVariantAsSQL(Object AValue, Char AQuote)
+  //{
+  //  return ValueToSQLText(AValue, AQuote);
+  //}
 
   /// <summary>
   /// Конвертирует значение параметра из строки
@@ -454,7 +596,6 @@ public class Sql
   {
     try
     {
-//      if (style == ValueDbStyle.XML)
         switch (type)
         {
           case SqlDbType.Bit      : return new SqlBoolean(XmlConvert.ToBoolean(value));
